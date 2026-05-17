@@ -172,6 +172,7 @@ interface GameStore extends GameState {
     storyPace: GameState['player']['storyPace']
     plotPreference: GameState['player']['plotPreference']
     memberId: RIIZEMember
+    customBoyfriendName?: string
   }) => void
   advanceWeek: () => void
   advanceDay: () => void
@@ -223,6 +224,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   createGame: (options) => {
     const memberData = getMemberData(options.memberId)
+    const boyfriendName = options.customBoyfriendName || memberData.nameZh
     const persona = getRandomPersona(options.memberId)
     const identityData = {
       student: { money: 30, mood: 60, popularity: 10, lifeStability: 50 },
@@ -242,7 +244,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       initialBoyfriendMessages.push({
         id: `msg_${Date.now()}_bf`,
         sender: 'boyfriend',
-        senderName: memberData.nameZh,
+        senderName: boyfriendName,
         textKo: storyOpening.firstMessageKo,
         textZh: storyOpening.firstMessageZh,
         timestamp: Date.now() - 60000,
@@ -258,7 +260,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       sender: 'npc',
       senderName: options.bestieName || '智恩',
       textKo: '',
-      textZh: `姐妹！你和${memberData.nameZh}怎么样了？快跟我说说！🤭`,
+      textZh: `姐妹！你和${boyfriendName}怎么样了？快跟我说说！🤭`,
       timestamp: Date.now() - 30000,
       isRead: false,
       isRecalled: false,
@@ -268,7 +270,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const boyfriendThread: ChatThread = {
       id: 'thread_boyfriend',
-      participantName: memberData.nameZh,
+      participantName: boyfriendName,
       participantAvatar: memberData.avatar,
       messages: initialBoyfriendMessages,
       unreadCount: initialBoyfriendMessages.filter(m => !m.isRead).length,
@@ -288,7 +290,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastActive: '5分钟前',
       relationship: '闺蜜'
     }
-    const socialContent = getInitialSocialContent(memberData.nameZh, memberData.stageName)
+    const socialContent = getInitialSocialContent(boyfriendName, memberData.stageName)
     set({
       phase: 'playing',
       week: 1,
@@ -312,7 +314,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       maleLead: {
         memberId: options.memberId,
-        name: memberData.nameZh,
+        name: boyfriendName,
         stageName: memberData.stageName,
         affection: 55,
         trust: 45,
@@ -347,7 +349,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         maleLead: {
           ...initialState.maleLead,
           memberId: options.memberId,
-          name: memberData.nameZh,
+          name: boyfriendName,
           stageName: memberData.stageName,
           affection: memberData.initialAffection,
           trust: memberData.initialTrust,

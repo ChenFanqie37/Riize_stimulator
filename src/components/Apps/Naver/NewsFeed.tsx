@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search, TrendingUp, Clock, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { NaverNews } from '@/types/game'
+import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 
 function generateNewsComments(article: NaverNews, fanSuspicion: number): { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] {
   const comments: { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] = []
@@ -69,7 +70,7 @@ export default function NewsFeed() {
         <div className="flex-1 overflow-y-auto">
           <div className="px-3 py-3">
             <p className="text-sm font-bold text-gray-800 leading-snug mb-2">{article.title}</p>
-            <p className="text-xs text-gray-600 leading-relaxed mb-3">{article.summary}</p>
+            <TranslateText {...parseMixedText(article.summary)} koStyle={{ fontSize: '12px', lineHeight: 1.5 }} />
             <div className="flex items-center gap-3 mb-3">
               <span className="text-[10px] text-gray-400">{article.source}</span>
               <div className="flex items-center gap-1">
@@ -121,7 +122,7 @@ export default function NewsFeed() {
                           {cfg.icon} {cfg.label}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-600">{c.text}</p>
+                      <TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '11px' }} />
                     </div>
                   </div>
                 )
@@ -184,7 +185,7 @@ export default function NewsFeed() {
                 <p className="text-xs font-bold text-gray-800 leading-snug mb-1">
                   {article.title}
                 </p>
-                <p className="text-[11px] text-gray-500 line-clamp-2 mb-1.5">{article.summary}</p>
+                <TranslateText {...parseMixedText(article.summary)} koStyle={{ fontSize: '11px' }} />
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-400">{article.source}</span>
                   <div className="flex items-center gap-0.5">

@@ -46,6 +46,7 @@ export default function CharacterCreation() {
   const [age, setAge] = useState(22)
   const [identity, setIdentity] = useState<PlayerIdentity | null>(null)
   const [memberId, setMemberId] = useState<RIIZEMember | null>(null)
+  const [customBoyfriendName, setCustomBoyfriendName] = useState('')
   const [fanLevel, setFanLevel] = useState<FanLevel>('casual')
   const [storyPace, setStoryPace] = useState<StoryPace>('standard')
   const [plotPreference, setPlotPreference] = useState<PlotPreference>('A')
@@ -71,6 +72,7 @@ export default function CharacterCreation() {
       storyPace,
       plotPreference,
       memberId,
+      customBoyfriendName: customBoyfriendName.trim() || undefined,
     })
   }
 
@@ -191,7 +193,10 @@ export default function CharacterCreation() {
               {riizeMembers.map((m) => (
                 <button
                   key={m.memberId}
-                  onClick={() => setMemberId(m.memberId)}
+                  onClick={() => {
+                    setMemberId(m.memberId)
+                    if (!customBoyfriendName) setCustomBoyfriendName('')
+                  }}
                   className="text-left p-4 rounded-xl transition-all duration-200"
                   style={{
                     background: memberId === m.memberId ? 'rgba(0,122,255,0.08)' : '#FFFFFF',
@@ -218,6 +223,25 @@ export default function CharacterCreation() {
                 </button>
               ))}
             </div>
+            {memberId && (
+              <div className="mt-4 max-w-sm mx-auto" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <p className="text-[#8E8E93] text-xs mb-2">自定义他在游戏里的称呼（留空则使用原名）</p>
+                <input
+                  type="text"
+                  value={customBoyfriendName}
+                  onChange={(e) => setCustomBoyfriendName(e.target.value)}
+                  placeholder={riizeMembers.find(m => m.memberId === memberId)?.nameZh || ''}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1.5px solid rgba(0,0,0,0.08)',
+                    color: '#1C1C1E',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#007AFF' }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(0,0,0,0.08)' }}
+                />
+              </div>
+            )}
           </div>
         )}
 

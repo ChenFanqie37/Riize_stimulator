@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { X, Eye, Camera, ChevronUp, Send } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { InstagramPost } from '@/types/game'
+import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 
 const tagGradients: Record<string, string> = {
   selfie: 'linear-gradient(135deg, #f093fb, #f5576c)',
@@ -131,9 +132,7 @@ export default function Story({
           </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center p-8">
-            <p className="text-white text-lg text-center leading-relaxed drop-shadow-lg">
-              {currentStory.text}
-            </p>
+            <TranslateText {...parseMixedText(currentStory.text)} koStyle={{ fontSize: '13px', lineHeight: 1.5 }} />
           </div>
         )}
 

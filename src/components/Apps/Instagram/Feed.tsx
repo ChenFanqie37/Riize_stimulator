@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Heart, MessageCircle, Send, Bookmark, Plus, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { InstagramPost } from '@/types/game'
+import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 
 const tagGradients: Record<string, string> = {
   selfie: 'linear-gradient(135deg, #f093fb, #f5576c)',
@@ -114,7 +115,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
             </p>
             <p className="text-xs text-[#3C3C3C] mb-1">
               <span className="font-semibold">{selectedPost.authorName}</span>{' '}
-              {selectedPost.text}
+              <TranslateText {...parseMixedText(selectedPost.text)} koStyle={{ fontSize: '13px', lineHeight: 1.5 }} />
             </p>
             {selectedPost.riskScore > 30 && (
               <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-lg bg-amber-50">
@@ -159,7 +160,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
                           {cfg.icon} {cfg.label}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-600">{c.text}</p>
+                      <p className="text-[11px] text-gray-600"><TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '12px' }} /></p>
                     </div>
                   </div>
                 )
@@ -298,7 +299,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
                 </p>
                 <p className="text-xs text-[#3C3C3C]">
                   <span className="font-semibold">{post.authorName}</span>{' '}
-                  {post.text}
+                  <TranslateText {...parseMixedText(post.text)} koStyle={{ fontSize: '12px', lineHeight: 1.4 }} />
                 </p>
                 {post.comments.length > 0 && (
                   <p className="text-[10px] text-gray-400 mt-0.5">

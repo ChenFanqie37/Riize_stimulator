@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AlertTriangle, MessageCircle, Flame, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { WeversePostType, WeversePost } from '@/types/game'
+import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 
 const typeConfig: Record<WeversePostType, { label: string; color: string; bg: string }> = {
   sugar: { label: '嗑糖', color: '#EC4899', bg: '#FDF2F8' },
@@ -105,7 +106,7 @@ export default function PostFeed() {
               )}
             </div>
             <p className="text-sm font-bold text-gray-800 mb-1.5">{post.title}</p>
-            <p className="text-xs text-gray-600 leading-relaxed mb-3">{post.content}</p>
+            <TranslateText {...parseMixedText(post.content)} koStyle={{ fontSize: '12px', lineHeight: 1.5 }} />
             <div className="flex items-center gap-3 mb-3">
               <div className="flex items-center gap-1">
                 <Flame size={12} className={post.heat > 70 ? 'text-red-500' : 'text-gray-400'} />
@@ -151,7 +152,7 @@ export default function PostFeed() {
                           {sCfg.icon} {sCfg.label}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-600">{c.text}</p>
+                      <TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '11px' }} />
                     </div>
                   </div>
                 )
@@ -218,7 +219,7 @@ export default function PostFeed() {
                 )}
               </div>
               <p className="text-xs font-semibold text-gray-800 mb-0.5">{post.title}</p>
-              <p className="text-[11px] text-gray-500 line-clamp-2">{post.content}</p>
+              <TranslateText {...parseMixedText(post.content)} koStyle={{ fontSize: '11px' }} />
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center gap-1">
                   <Flame size={11} className={post.heat > 70 ? 'text-red-500' : 'text-gray-400'} />

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { X, Heart, Shield, Clock, Gift, Camera, AlertTriangle, Star, ChevronRight, MapPin, Sparkles } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { GalleryPhoto, EvidenceFragment, ChatMessage } from '@/types/game'
+import { TranslateText } from '../Common/TranslateText'
 
 type DateType = 'cafe' | 'riverwalk' | 'nightdrive' | 'privatedinner' | 'movie' | 'amusement'
 type DatePhase = 'request' | 'prepare' | 'execute' | 'result'
@@ -889,8 +890,7 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
                   </div>
                   <span className="text-white/50 text-xs">{maleLead.name}</span>
                 </div>
-                <p className="text-white text-sm mb-1">{currentScene.boyfriendKo}</p>
-                <p className="text-white/40 text-xs">{currentScene.boyfriendZh}</p>
+                <TranslateText ko={currentScene.boyfriendKo} zh={currentScene.boyfriendZh} koStyle={{ fontSize: '14px', color: 'white' }} zhStyle={{ color: '#ccc' }} />
               </div>
 
               {triggeredEvents.length > 0 && (
@@ -1080,12 +1080,11 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
                 }}
               >
                 <p className="text-white/50 text-xs mb-2">他的约会后消息</p>
-                <p className="text-white text-sm mb-1">
-                  {selectedDateType && postDateMessages[selectedDateType].ko}
-                </p>
-                <p className="text-white/40 text-xs">
-                  {selectedDateType && postDateMessages[selectedDateType].zh}
-                </p>
+                <TranslateText
+                  ko={selectedDateType ? postDateMessages[selectedDateType].ko : ''}
+                  zh={selectedDateType ? postDateMessages[selectedDateType].zh : ''}
+                  koStyle={{ fontSize: '13px' }}
+                />
               </div>
 
               <button

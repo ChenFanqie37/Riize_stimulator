@@ -1,6 +1,7 @@
 import { Bell, Eye } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { NoticeLevel } from '@/types/game'
+import { TranslateText, TranslateLink, parseMixedText } from '../../Common/TranslateText'
 
 const levelConfig: Record<NoticeLevel, { label: string; color: string; bg: string; border: string }> = {
   gentle: { label: '温和', color: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -51,14 +52,18 @@ export default function NoticeList() {
                   <span className="text-[9px] text-red-400 animate-pulse">⚠ 高度敏感</span>
                 )}
               </div>
-              <p
-                className={`text-xs font-semibold mb-1 ${isSilence ? 'text-red-300' : 'text-gray-800'}`}
-              >
-                {notice.title}
-              </p>
-              <p className={`text-[11px] leading-relaxed ${isSilence ? 'text-red-400/70' : 'text-gray-500'}`}>
-                {notice.content}
-              </p>
+              <TranslateLink ko={notice.title} zh="" style={{ fontSize: '12px', fontWeight: 600, color: isSilence ? '#fca5a5' : '#1f2937' }} />
+              {/[가-힣]/.test(notice.content) ? (
+                <TranslateText
+                  {...parseMixedText(notice.content)}
+                  koStyle={{ fontSize: '11px', lineHeight: 1.5, color: isSilence ? 'rgba(248,113,113,0.7)' : '#6b7280' }}
+                  zhStyle={{ color: isSilence ? 'rgba(248,113,113,0.7)' : '#6b7280' }}
+                />
+              ) : (
+                <p className={`text-[11px] leading-relaxed ${isSilence ? 'text-red-400/70' : 'text-gray-500'}`}>
+                  {notice.content}
+                </p>
+              )}
               <div className="flex items-center gap-1 mt-1.5">
                 <Eye size={10} className={notice.isRead ? 'text-gray-300' : 'text-blue-400'} />
                 <span className="text-[9px] text-gray-400">
