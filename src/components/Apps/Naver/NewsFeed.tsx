@@ -3,6 +3,7 @@ import { Search, TrendingUp, Clock, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { NaverNews } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
+import AppAccountBar from '../../Common/AppAccountBar'
 
 function generateNewsComments(article: NaverNews, fanSuspicion: number): { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] {
   const comments: { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] = []
@@ -140,6 +141,7 @@ export default function NewsFeed() {
         <h1 className="text-white font-bold text-lg">NAVER</h1>
         <p className="text-white/70 text-[10px]">新闻与搜索</p>
       </div>
+      <AppAccountBar app="naver" />
 
       {searchHistory.length > 0 && (
         <div className="px-3 py-2 border-b border-gray-100">

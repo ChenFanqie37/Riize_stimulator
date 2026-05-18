@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Send, Bookmark, Plus, ArrowLeft } from 'lucide-re
 import { useGameStore } from '@/store/gameStore'
 import type { InstagramPost } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
+import AppAccountBar from '../../Common/AppAccountBar'
 
 const tagGradients: Record<string, string> = {
   selfie: 'linear-gradient(135deg, #f093fb, #f5576c)',
@@ -190,6 +191,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
           <Plus size={22} className="text-white" />
         </button>
       </div>
+      <AppAccountBar app="instagram" />
 
       <div
         ref={feedRef}

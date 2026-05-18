@@ -166,7 +166,7 @@ export default function ChatRoom() {
         const recentMessages = thread.messages.slice(-6).map(
           (m) => `${m.senderName}: ${m.textZh}`
         )
-        const bestieName = player.bestieName || '智恩'
+        const bestieName = player.bestieName || '闺蜜'
         const context = {
           bestieName,
           playerName: player.name,
@@ -210,7 +210,7 @@ export default function ChatRoom() {
         const fallbackMsg: ChatMessage = {
           id: `msg_${Date.now()}`,
           sender: 'npc',
-          senderName: player.bestieName || '智恩',
+          senderName: player.bestieName || '闺蜜',
           textKo: '',
           textZh: '宝我刚才信号不好，你再说一遍？',
           timestamp: Date.now(),

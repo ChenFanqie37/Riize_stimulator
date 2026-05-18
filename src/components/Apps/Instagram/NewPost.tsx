@@ -35,6 +35,9 @@ function getRiskBg(risk: number) {
 
 export default function NewPost({ onClose }: { onClose: () => void }) {
   const postInstagram = useGameStore((s) => s.postInstagram)
+  const performAction = useGameStore((s) => s.performAction)
+  const updateStats = useGameStore((s) => s.updateStats)
+  const addNotification = useGameStore((s) => s.addNotification)
   const player = useGameStore((s) => s.player)
   const risk = useGameStore((s) => s.risk)
   const hiddenRisk = useGameStore((s) => s.hiddenRisk)
@@ -56,6 +59,12 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const totalRisk = Math.max(0, Math.min(100, baseRisk + riskMod + (risk.fanSuspicion > 50 ? 10 : 0)))
 
   const handlePost = () => {
+    if (postType === 'story') {
+      performAction('post_instagram_story', { caption, visibility, template: category, showLocation })
+      onClose()
+      return
+    }
+
     const imageTags = category === 'normal' ? ['selfie'] : category === 'ambiguous' ? ['couple', 'mood'] : category === 'emotional' ? ['mood', 'night'] : category === 'provocative' ? ['night', 'selfie'] : ['cafe', 'food']
     const { riskScore, hiddenRiskChanges } = calculatePostRisk(caption, imageTags, visibility, hiddenRisk)
     const post: InstagramPost = {
@@ -76,7 +85,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
       screenshottedBy: [],
       boyfriendViewed: false,
       createdAt: Date.now(),
-      expiresAt: postType === 'story' ? Date.now() + 24 * 60 * 60 * 1000 : undefined,
+      expiresAt: undefined,
     }
     postInstagram(post)
     const clues = createClueFromPost(caption, imageTags, 'instagram', day, week, visibility)
@@ -87,6 +96,44 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
     })
     if (Object.keys(hiddenRiskChanges).length > 0) {
       updateHiddenRisk(hiddenRiskChanges)
+    }
+    updateStats({
+      affection: category === 'ambiguous' ? 3 : category === 'provocative' ? -1 : 1,
+      fanSuspicion: Math.ceil(riskScore / 18) + (showLocation ? 2 : 0),
+      publicHeat: riskScore >= 40 ? 5 : 1,
+      secrecy: -Math.ceil(riskScore / 28),
+      paparazziAttention: showLocation ? 4 : riskScore >= 45 ? 2 : 0,
+    })
+    addNotification({
+      id: `notif_ig_${Date.now()}`,
+      app: 'instagram',
+      title: 'Instagram 已发布',
+      content: riskScore >= 35 ? '这条帖子的线索较明显，粉丝可能会开始截图讨论。' : '帖子发布成功，暂时没有明显异常。',
+      urgency: riskScore >= 35 ? 'high' : 'medium',
+      isRead: false,
+      createdAt: Date.now(),
+    })
+    if (riskScore >= 35) {
+      useGameStore.setState((state) => ({
+        weverse: {
+          ...state.weverse,
+          posts: [
+            ...state.weverse.posts,
+            {
+              id: `wv_ig_post_${Date.now()}`,
+              type: 'analysis',
+              author: 'zoom_in_briize',
+              title: '이 사진 배경 좀 익숙하지 않아?',
+              content: `有人开始放大你刚发的照片。背景、时间和${state.maleLead.stageName}的行程被拿来对比，但评论区还在吵“别造谣”。`,
+              heat: Math.min(100, 28 + riskScore + state.risk.fanSuspicion),
+              comments: 80 + riskScore,
+              isPlayerAlt: false,
+              relatedEvidenceIds: [],
+              createdAt: Date.now(),
+            },
+          ],
+        },
+      }))
     }
     onClose()
   }

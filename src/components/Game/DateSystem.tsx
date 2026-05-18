@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { X, Heart, Shield, Clock, Gift, Camera, AlertTriangle, Star, ChevronRight, MapPin, Sparkles } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
-import type { GalleryPhoto, EvidenceFragment, ChatMessage } from '@/types/game'
+import type { CalendarEvent, DelayedConsequence, EvidenceFragment, GalleryPhoto, ChatMessage, Notification, Trace } from '@/types/game'
+import { generateCustomDatePlan, type CustomDatePlan } from '@/engine/gemini'
 import { TranslateText } from '../Common/TranslateText'
 
-type DateType = 'cafe' | 'riverwalk' | 'nightdrive' | 'privatedinner' | 'movie' | 'amusement'
+type DateType = 'cafe' | 'riverwalk' | 'nightdrive' | 'privatedinner' | 'movie' | 'amusement' | 'backdoor' | 'hotel' | 'airport' | 'studio' | 'home' | 'brandparty' | 'convenience' | 'musicshow' | 'rooftop' | 'custom'
 type DatePhase = 'request' | 'prepare' | 'execute' | 'result'
 type OutfitChoice = 'casual' | 'dressup' | 'disguise'
 type GiftChoice = 'none' | 'small' | 'handmade'
@@ -108,6 +109,116 @@ const dateTypes: DateTypeConfig[] = [
     riskLabel: '高风险',
     riskColor: '#ef4444',
   },
+  {
+    id: 'backdoor',
+    name: '练习室后门',
+    icon: '🚪',
+    risk: 4,
+    affectionBonus: 11,
+    secrecyImpact: -8,
+    description: '非公开通道的十分钟，门禁、CCTV、经纪人都可能留下痕迹',
+    riskLabel: '高压',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'hotel',
+    name: '酒店黑屏夜',
+    icon: '🏨',
+    risk: 6,
+    affectionBonus: 18,
+    secrecyImpact: -14,
+    description: '门在身后合上，画面黑屏；第二天只剩未接来电和香水味',
+    riskLabel: '爆炸风险',
+    riskColor: '#dc2626',
+  },
+  {
+    id: 'airport',
+    name: '机场转机',
+    icon: '✈️',
+    risk: 5,
+    affectionBonus: 13,
+    secrecyImpact: -12,
+    description: '海外转机的一小时，站姐镜头、航班记录和同款帽子都很危险',
+    riskLabel: '高风险',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'studio',
+    name: '录音室夜宵',
+    icon: '🎧',
+    risk: 3,
+    affectionBonus: 10,
+    secrecyImpact: -5,
+    description: '凌晨录音室的外卖袋、歌词纸和语音备忘录会变成甜蜜证据',
+    riskLabel: '中高风险',
+    riskColor: '#f97316',
+  },
+  {
+    id: 'home',
+    name: '公寓藏匿',
+    icon: '🏠',
+    risk: 4,
+    affectionBonus: 16,
+    secrecyImpact: -9,
+    description: '窗帘拉上的安全屋，楼下私生和邻居快递都可能出卖你们',
+    riskLabel: '高压',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'brandparty',
+    name: '品牌派对偷见',
+    icon: '🥂',
+    risk: 5,
+    affectionBonus: 12,
+    secrecyImpact: -11,
+    description: '名流、媒体和同场女艺人都在，越刺激越容易出圈',
+    riskLabel: '高风险',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'convenience',
+    name: '深夜便利店',
+    icon: '🧃',
+    risk: 3,
+    affectionBonus: 8,
+    secrecyImpact: -6,
+    description: '一袋拉面和同款饮料，便利店 CCTV 比粉丝更诚实',
+    riskLabel: '中风险',
+    riskColor: '#f97316',
+  },
+  {
+    id: 'musicshow',
+    name: '打歌后台擦肩',
+    icon: '🎤',
+    risk: 5,
+    affectionBonus: 12,
+    secrecyImpact: -12,
+    description: '待机室、走廊、站姐返图和工作人员视线挤在一起，最像偷情现场',
+    riskLabel: '高风险',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'rooftop',
+    name: '宿舍天台',
+    icon: '🌃',
+    risk: 4,
+    affectionBonus: 14,
+    secrecyImpact: -8,
+    description: '楼顶风很大，成员可能突然上来，楼下也可能有人架镜头',
+    riskLabel: '高压',
+    riskColor: '#ef4444',
+  },
+  {
+    id: 'custom',
+    name: '自定义约会',
+    icon: '✍',
+    risk: 3,
+    affectionBonus: 8,
+    secrecyImpact: -6,
+    description: '描述你想要的约会，LLM 会实时生成路线、选项和曝光判定',
+    riskLabel: 'AI判定',
+    riskColor: '#a855f7',
+  },
 ]
 
 const outfitConfigs: Record<OutfitChoice, { label: string; affection: number; riskMod: number; desc: string }> = {
@@ -134,10 +245,184 @@ const randomEvents = [
   { id: 'flash', name: '偷拍闪光灯', probability: 0.05, secrecy: -20, fanSuspicion: 25, narrative: '远处一道闪光灯亮起——有人偷拍！' },
   { id: 'friend_meet', name: '朋友偶遇', probability: 0.12, secrecy: -3, fanSuspicion: 2, narrative: '他的队友突然出现在同一家店，尴尬的打招呼……' },
   { id: 'company_call', name: '公司来电', probability: 0.1, secrecy: 0, fanSuspicion: 0, careerPressure: 5, narrative: '他的手机响了——经纪人来电。他的表情瞬间严肃起来……' },
+  { id: 'saseng_tail', name: '私生跟车', probability: 0.09, secrecy: -18, fanSuspicion: 18, paparazziAttention: 12, narrative: '后视镜里那辆车第三次出现，他的手指敲在方向盘上，声音一下子冷下来。' },
+  { id: 'cctv_capture', name: 'CCTV 留影', probability: 0.11, secrecy: -12, fanSuspicion: 12, companyAlert: 10, narrative: '电梯门合上的瞬间，你看见角落里的 CCTV 正对着你们。' },
+  { id: 'same_item_photo', name: '同款入镜', probability: 0.14, secrecy: -8, fanSuspicion: 15, narrative: '你手上的小物件不小心入镜，正好和他昨天直播里出现的一模一样。' },
+  { id: 'manager_nearby', name: '经纪人附近', probability: 0.07, secrecy: -6, fanSuspicion: 0, companyAlert: 18, careerPressure: 8, narrative: '经纪人的车停在街对面，他把帽檐压低，半晌没有说话。' },
+  { id: 'live_hint', name: '直播口误', probability: 0.08, secrecy: -6, fanSuspicion: 16, publicHeat: 6, narrative: '他晚上的直播里差点说出今天的地点，粉丝立刻开始剪切片。' },
+  { id: 'friend_story', name: '朋友误发 Story', probability: 0.07, secrecy: -10, fanSuspicion: 14, publicHeat: 8, narrative: '同行朋友发了一秒背景 Story，删除得很快，但截图已经流出。' },
+  { id: 'taxi_receipt', name: '出租车小票', probability: 0.09, secrecy: -7, fanSuspicion: 8, paparazziAttention: 8, narrative: '出租车小票夹在外卖袋里，时间和目的地都太具体。' },
+  { id: 'couple_scent', name: '同款香味', probability: 0.06, secrecy: -5, fanSuspicion: 10, narrative: '工作人员说他身上有陌生香水味，粉丝把品牌扒了出来。' },
+  { id: 'staff_gossip', name: '工作人员八卦', probability: 0.08, secrecy: -9, companyAlert: 12, insiderLeakRisk: 10, narrative: '后台有人在茶水间提到“他最近总是绕路”，消息像小火苗一样窜出去。' },
+  { id: 'fan_cam_overlap', name: '饭拍重合', probability: 0.1, secrecy: -13, fanSuspicion: 18, publicHeat: 6, narrative: '两段饭拍角度一拼，你们擦肩而过的路线刚好能对上。' },
+  { id: 'phone_light', name: '手机亮屏', probability: 0.09, secrecy: -6, fanSuspicion: 9, narrative: '他手机亮了一下，锁屏上的昵称只露出一个字，却足够让人发疯。' },
+  { id: 'teammate_cover', name: '队友帮忙打掩护', probability: 0.1, secrecy: 5, fanSuspicion: -4, trust: 3, narrative: '队友突然插进来把话题带走，像是早就知道该怎么救场。' },
 ]
 
+const fallbackDateProfiles: Partial<Record<DateType, {
+  place: string
+  hook: string
+  arrivalKo: string
+  arrivalZh: string
+  intimate: string
+  danger: string
+  goodbyeKo: string
+  goodbyeZh: string
+}>> = {
+  backdoor: {
+    place: '练习室后门',
+    hook: '后门的灯忽明忽暗，门禁响起一声轻响，他把你拉进监控死角。',
+    arrivalKo: '딱 십 분만. 나 진짜 보고 싶었어.',
+    arrivalZh: '就十分钟。我真的很想你。',
+    intimate: '他还穿着练习服，额角有汗，靠近时像把舞台上所有光都带到了你面前。',
+    danger: '楼上传来脚步声，经纪人的声音隔着门传下来。',
+    goodbyeKo: '나 올라가야 해. 근데 놓기 싫다.',
+    goodbyeZh: '我得上去了。可是舍不得松手。',
+  },
+  hotel: {
+    place: '酒店房间',
+    hook: '电梯数字一层层往上跳，你们谁都没有说话，只有房卡在他指尖轻轻响。',
+    arrivalKo: '오늘은 아무도 모르게 있어줘.',
+    arrivalZh: '今晚就谁也别知道，只陪我待一会儿。',
+    intimate: '门在身后合上，镜头停在凌乱的外套和亮着的手机屏幕上；之后的部分只剩黑屏和第二天的后果。',
+    danger: '楼下大厅出现了熟悉的站姐镜头，房间服务记录也会留下时间。',
+    goodbyeKo: '아침에 먼저 나갈게. 너는 천천히 나와.',
+    goodbyeZh: '早上我先走。你慢一点出来。',
+  },
+  airport: {
+    place: '机场转机区',
+    hook: '候机屏不断刷新，他戴着口罩从人群里绕到你身后。',
+    arrivalKo: '여기서 만나는 거 미쳤지. 근데 좋아.',
+    arrivalZh: '在这里见面太疯了。可是我喜欢。',
+    intimate: '他把自己的帽子扣到你头上，指尖擦过耳侧，像在拥挤人群里盖下一个只有你们懂的章。',
+    danger: '远处粉丝的长焦扫过来，航班时间和登机口很容易被拼在一起。',
+    goodbyeKo: '탑승하면 바로 문자해. 내가 계속 볼게.',
+    goodbyeZh: '登机就给我发消息。我会一直看手机。',
+  },
+  studio: {
+    place: '录音室',
+    hook: '凌晨的录音室只亮着一盏灯，他把耳机分给你一边。',
+    arrivalKo: '이 부분, 너 생각하면서 불렀어.',
+    arrivalZh: '这一段，我是想着你唱的。',
+    intimate: '他压低声音在你耳边哼了未公开的旋律，尾音轻得像在撒娇。',
+    danger: '桌上的歌词纸写着日期和你的昵称，如果被拍到就是新的暗号证据。',
+    goodbyeKo: '이 노래 나오면 너 먼저 생각날 거야.',
+    goodbyeZh: '这首歌发行的时候，我第一个会想到你。',
+  },
+  home: {
+    place: '公寓',
+    hook: '你拉上窗帘，楼下的私生还在徘徊，他在玄关很轻地抱住你。',
+    arrivalKo: '여기 있으면 조금 숨 쉴 수 있어.',
+    arrivalZh: '在这里，我好像才能喘口气。',
+    intimate: '沙发边的灯暗下来，你们把手机都扣在桌上，世界终于被关在门外。',
+    danger: '快递电话、邻居脚步、楼下车灯，每一样都可能让这个安全屋变成证据点。',
+    goodbyeKo: '나 너무 오래 있었지... 그래도 후회 안 해.',
+    goodbyeZh: '我是不是待太久了……但我不后悔。',
+  },
+  brandparty: {
+    place: '品牌派对',
+    hook: '香槟塔旁全是镜头，他穿过人群时，只用余光看了你一眼。',
+    arrivalKo: '눈 마주치지 마. 나 웃을 것 같아.',
+    arrivalZh: '别跟我对视。我怕我会笑出来。',
+    intimate: '走廊尽头的短暂停留像偷来的胜利，你们离得很近，却谁也不能先伸手。',
+    danger: '媒体、女艺人、品牌工作人员都在场，任何同框都会被剪成热帖。',
+    goodbyeKo: '끝나고 전화할게. 오늘 너 진짜 예뻤어.',
+    goodbyeZh: '结束后给你打电话。你今天真的很漂亮。',
+  },
+  convenience: {
+    place: '便利店',
+    hook: '凌晨两点的便利店只剩微波炉声，他把最后一盒草莓牛奶塞给你。',
+    arrivalKo: '이런 거라도 같이 하니까 데이트 같네.',
+    arrivalZh: '就算只是这样一起，也像约会。',
+    intimate: '他用外套挡住你们交叠的手，笑得像做坏事成功的小孩。',
+    danger: '便利店 CCTV、收据时间和同款饮料，粉丝最会把这种小东西拼成大故事。',
+    goodbyeKo: '다음엔 라면도 같이 먹자. 몰래.',
+    goodbyeZh: '下次一起吃拉面吧。偷偷地。',
+  },
+  musicshow: {
+    place: '打歌后台',
+    hook: '待机室门口人来人往，他从队伍末尾回头看了你一眼，像什么都没发生。',
+    arrivalKo: '여기서 티 내면 진짜 끝이야. 그래도 봐서 좋다.',
+    arrivalZh: '在这里露馅就真的完了。可是能看见你真好。',
+    intimate: '他递给你一瓶没开封的水，指尖碰到的那一下比拥抱还危险。',
+    danger: '站姐预览图刷出来，走廊尽头有半截侧影，角度刚好对着你刚才站的位置。',
+    goodbyeKo: '무대 끝나고 연락할게. 지금은 모르는 척해.',
+    goodbyeZh: '舞台结束后联系你。现在先装作不认识。',
+  },
+  rooftop: {
+    place: '宿舍天台',
+    hook: '天台风很大，他穿着帽衫站在灯影外，听见门响才转过身。',
+    arrivalKo: '여긴 아무도 안 오겠지... 아마도.',
+    arrivalZh: '这里应该没人会来吧……大概。',
+    intimate: '城市灯光在下面闪，他把帽檐压到你头上，笑得像终于偷到一点自由。',
+    danger: '楼梯间传来成员的笑声，楼下马路有一辆车停得太久。',
+    goodbyeKo: '춥다. 내일 감기 걸리면 내가 책임질게.',
+    goodbyeZh: '冷吧。明天感冒的话我负责。',
+  },
+}
+
+function generateFallbackScenes(dateType: DateType): DateScene[] {
+  const profile = fallbackDateProfiles[dateType] || {
+    place: '秘密地点',
+    hook: '你们在一个不会被公开行程写进表格的地方见面，空气里都是紧张和甜味。',
+    arrivalKo: '왔어? 나 계속 기다렸어.',
+    arrivalZh: '来了？我一直在等你。',
+    intimate: '他靠近时压低了声音，像把全世界都挡在你们身后。',
+    danger: '远处有人拿起手机，你们同时安静下来。',
+    goodbyeKo: '조심히 가. 오늘 일은 우리만 알자.',
+    goodbyeZh: '路上小心。今天的事只有我们知道。',
+  }
+
+  return [
+    {
+      type: 'arrival_greeting',
+      narrative: profile.hook,
+      boyfriendKo: profile.arrivalKo,
+      boyfriendZh: profile.arrivalZh,
+      choices: [
+        { id: `${dateType}_rush_hug`, text: '先抱住他，什么都不问', affection: 7, trust: 2, secrecy: -4, mood: 5 },
+        { id: `${dateType}_scan`, text: '确认周围没有镜头再靠近', affection: 1, trust: 2, secrecy: 4, mood: -1 },
+        { id: `${dateType}_tease`, text: '低声说“你胆子越来越大了”', affection: 5, trust: 1, secrecy: -2, mood: 4 },
+      ],
+    },
+    {
+      type: 'intimate_moment',
+      narrative: profile.intimate,
+      boyfriendKo: '너랑 있으면 내가 좀 이상해져.',
+      boyfriendZh: '和你在一起的时候，我会变得有点不像自己。',
+      choices: [
+        { id: `${dateType}_closer`, text: '贴近他，让他把话说完', affection: 9, trust: 3, secrecy: -5, mood: 7 },
+        { id: `${dateType}_black_screen`, text: '把手机扣下，留给黑屏后的第二天', affection: 12, trust: 4, secrecy: -8, mood: 8, riskTag: 'adult_fade' },
+        { id: `${dateType}_hold_back`, text: '忍住冲动，提醒他别失控', affection: -1, trust: 4, secrecy: 5, mood: -1 },
+      ],
+    },
+    {
+      type: 'unexpected_event',
+      narrative: profile.danger,
+      boyfriendKo: '잠깐만. 우리 지금 움직이면 더 티 나.',
+      boyfriendZh: '等一下。我们现在动反而更明显。',
+      choices: [
+        { id: `${dateType}_freeze`, text: '装作陌生人，各自低头看手机', affection: -2, trust: 1, secrecy: 7, mood: -2 },
+        { id: `${dateType}_bold`, text: '继续靠在他身边，赌他们不敢拍', affection: 8, trust: 1, secrecy: -10, mood: 6 },
+        { id: `${dateType}_split`, text: '分开十分钟后再汇合', affection: 0, trust: 3, secrecy: 5, mood: 0 },
+      ],
+    },
+    {
+      type: 'departure',
+      narrative: `${profile.place}的时间到了，甜蜜没有消失，只是开始变成证据。`,
+      boyfriendKo: profile.goodbyeKo,
+      boyfriendZh: profile.goodbyeZh,
+      choices: [
+        { id: `${dateType}_save_photo`, text: '偷偷拍一张只给自己看的照片', affection: 4, trust: 1, secrecy: -6, mood: 5 },
+        { id: `${dateType}_delete_traces`, text: '当场互删定位和聊天预览', affection: -1, trust: 2, secrecy: 6, mood: -1 },
+        { id: `${dateType}_promise`, text: '约定下次更疯一点', affection: 6, trust: 2, secrecy: -4, mood: 6 },
+      ],
+    },
+  ]
+}
+
 function generateScenes(dateType: DateType): DateScene[] {
-  const scenePool: Record<DateType, DateScene[]> = {
+  const scenePool: Partial<Record<DateType, DateScene[]>> = {
     cafe: [
       {
         type: 'arrival_greeting',
@@ -427,7 +712,7 @@ function generateScenes(dateType: DateType): DateScene[] {
     ],
   }
 
-  return scenePool[dateType]
+  return scenePool[dateType] || generateFallbackScenes(dateType)
 }
 
 const postDateMessages: Record<DateType, { ko: string; zh: string }> = {
@@ -437,6 +722,32 @@ const postDateMessages: Record<DateType, { ko: string; zh: string }> = {
   privatedinner: { ko: '오늘 밥 맛있었어? 다음엔 내가 직접 해줄게.', zh: '今天饭好吃吗？下次我亲手给你做。' },
   movie: { ko: '영화 재미있었어? 나는 네 손 잡는 게 더 재밌었는데 ㅎㅎ', zh: '电影好看吗？我觉得牵你的手更有意思 呵呵' },
   amusement: { ko: '오늘 진짜 최고였어! 다음에 또 가자, 약속!', zh: '今天真的太棒了！下次再去，说好了！' },
+  backdoor: { ko: '아까 문 닫히는 소리 아직도 생각나. 조심히 들어갔어?', zh: '刚才门关上的声音我还在想。你安全到家了吗？' },
+  hotel: { ko: '아침까지 네 향 남아있었어. 오늘은 먼저 연락하지 마, 내가 할게.', zh: '到早上都还留着你的香味。今天先别主动联系，我来找你。' },
+  airport: { ko: '비행기 타면 바로 문자해. 사람 많았는데도 너만 보였어.', zh: '上飞机就给我发消息。明明人那么多，我只看见你。' },
+  studio: { ko: '방금 녹음한 거 너한테 제일 먼저 들려주고 싶어.', zh: '刚录完的那段，我最想第一个放给你听。' },
+  home: { ko: '오늘 거실 불빛 생각나서 잠이 안 와. 너무 좋았어.', zh: '一直想起今天客厅的灯光，睡不着。太好了。' },
+  brandparty: { ko: '오늘 눈 마주치면 들킬 것 같아서 참느라 죽는 줄.', zh: '今天差点因为和你对视露馅，我忍得快疯了。' },
+  convenience: { ko: '딸기우유 보니까 또 너 생각났어. 다음엔 라면까지.', zh: '看到草莓牛奶又想起你了。下次再一起吃拉面。' },
+  musicshow: { ko: '무대에서 너 있는 쪽 안 보려고 했는데 실패했어.', zh: '舞台上本来想忍住不看你那边，但失败了。' },
+  rooftop: { ko: '옥상 바람 생각나. 네 손 차가웠던 것도.', zh: '一直想起天台的风，还有你冰冰的手。' },
+  custom: { ko: '오늘 일은 우리만 알자. 근데 나 계속 생각날 것 같아.', zh: '今天的事只有我们知道。但我可能会一直想。' },
+}
+
+function estimateCustomRisk(idea: string): { risk: number; label: string; reason: string } {
+  const text = idea.toLowerCase()
+  let risk = 3
+  if (/酒店|hotel|机场|airport|后台|待机|公司|练习室|宿舍|公寓|车|car|品牌|派对|演唱会|签售|打歌/.test(text)) risk = 5
+  if (/公开|人很多|粉丝|站姐|私生|狗仔|直播|同款|合照|亲|过夜/.test(text)) risk = Math.max(risk, 5)
+  if (/家里|天台|深夜|便利店|电影|包间|录音室/.test(text)) risk = Math.max(risk, 4)
+  if (/只聊天|线上|电话|语音|日记/.test(text)) risk = Math.min(risk, 2)
+  const label = risk >= 6 ? '爆炸风险' : risk >= 5 ? '高风险' : risk >= 4 ? '高压' : risk >= 3 ? '中风险' : '低风险'
+  const reason = risk >= 5
+    ? '这个设定会留下公开动线、镜头或第三方目击，粉丝很容易拼线索。'
+    : risk >= 3
+      ? '这个设定甜度够高，但同款、时间和小范围目击仍然危险。'
+      : '这个设定主要风险来自聊天记录和情绪痕迹。'
+  return { risk, label, reason }
 }
 
 interface DateSystemProps {
@@ -448,6 +759,9 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
   const maleLead = useGameStore((s) => s.maleLead)
   const player = useGameStore((s) => s.player)
   const risk = useGameStore((s) => s.risk)
+  const clueLedger = useGameStore((s) => s.clueLedger)
+  const fandomStage = useGameStore((s) => s.fandomStage)
+  const paparazziStage = useGameStore((s) => s.paparazziStage)
   const updateStats = useGameStore((s) => s.updateStats)
   const updateBoyfriendMemory = useGameStore((s) => s.updateBoyfriendMemory)
   const addEvidence = useGameStore((s) => s.addEvidence)
@@ -467,6 +781,10 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
   const [spotted, setSpotted] = useState(false)
   const [photosAdded, setPhotosAdded] = useState(false)
   const [showResult, setShowResult] = useState(false)
+  const [customIdea, setCustomIdea] = useState('')
+  const [customPlan, setCustomPlan] = useState<CustomDatePlan | null>(null)
+  const [isGeneratingCustom, setIsGeneratingCustom] = useState(false)
+  const [customError, setCustomError] = useState('')
 
   const resetDate = useCallback(() => {
     setPhase('request')
@@ -482,6 +800,10 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
     setSpotted(false)
     setPhotosAdded(false)
     setShowResult(false)
+    setCustomIdea('')
+    setCustomPlan(null)
+    setIsGeneratingCustom(false)
+    setCustomError('')
   }, [])
 
   const handleClose = () => {
@@ -494,10 +816,59 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
     setPhase('prepare')
   }
 
-  const handleStartDate = () => {
+  const handleStartDate = async () => {
     if (!selectedDateType) return
-    const generatedScenes = generateScenes(selectedDateType)
-    setScenes(generatedScenes)
+    if (selectedDateType === 'custom') {
+      if (!customIdea.trim()) {
+        setCustomError('先写下你想要的约会内容。')
+        return
+      }
+      setIsGeneratingCustom(true)
+      setCustomError('')
+      const estimate = estimateCustomRisk(customIdea)
+      try {
+        const plan = await generateCustomDatePlan({
+          idea: customIdea,
+          boyfriendName: maleLead.name,
+          boyfriendStageName: maleLead.stageName,
+          boyfriendPersona: maleLead.hiddenPersona,
+          relationshipStage: maleLead.relationshipStage,
+          affection: maleLead.affection,
+          trust: maleLead.trust,
+          week: useGameStore.getState().week,
+          day: useGameStore.getState().day,
+          secrecy: risk.secrecy,
+          fanSuspicion: risk.fanSuspicion,
+          companyAlert: risk.companyAlert,
+          fandomStage,
+          paparazziStage,
+          recentClues: clueLedger.slice(-6).map((c) => c.description),
+        })
+        setCustomPlan(plan)
+        setScenes(plan.scenes)
+      } catch {
+        const fallbackPlan: CustomDatePlan = {
+          title: '自定义秘密约会',
+          risk: estimate.risk,
+          affectionBonus: 8 + estimate.risk,
+          secrecyImpact: -estimate.risk * 2,
+          riskLabel: estimate.label,
+          riskReason: estimate.reason,
+          scenes: generateFallbackScenes('custom'),
+          afterMessageKo: postDateMessages.custom.ko,
+          afterMessageZh: postDateMessages.custom.zh,
+          delayedConsequence: `${customIdea.slice(0, 20)}这次约会的细节被粉丝从时间线里重新翻出来。`,
+        }
+        setCustomPlan(fallbackPlan)
+        setScenes(fallbackPlan.scenes)
+        setCustomError('LLM 暂时不可用，已用本地判定生成约会路线。')
+      } finally {
+        setIsGeneratingCustom(false)
+      }
+    } else {
+      const generatedScenes = generateScenes(selectedDateType)
+      setScenes(generatedScenes)
+    }
     setCurrentSceneIdx(0)
     setPhase('execute')
   }
@@ -523,6 +894,15 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
           setTriggeredEvents((prev) => [...prev, event.name])
           if (event.secrecy < -10) setSpotted(true)
           newStats.secrecy += event.secrecy
+          updateStats({
+            fanSuspicion: event.fanSuspicion || 0,
+            publicHeat: event.publicHeat || 0,
+            companyAlert: event.companyAlert || 0,
+            careerPressure: event.careerPressure || 0,
+            paparazziAttention: event.paparazziAttention || 0,
+            trust: event.trust || 0,
+            insiderLeakRisk: event.insiderLeakRisk || 0,
+          })
           setAccumulatedStats({ ...newStats })
         }
       }
@@ -538,7 +918,18 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
 
   const finishDate = (finalStats: { affection: number; trust: number; secrecy: number; mood: number }) => {
     if (!selectedDateType) return
-    const dateConfig = dateTypes.find((d) => d.id === selectedDateType)!
+    const baseDateConfig = dateTypes.find((d) => d.id === selectedDateType)!
+    const dateConfig = selectedDateType === 'custom' && customPlan
+      ? {
+          ...baseDateConfig,
+          name: customPlan.title || baseDateConfig.name,
+          risk: customPlan.risk,
+          affectionBonus: customPlan.affectionBonus,
+          secrecyImpact: customPlan.secrecyImpact,
+          riskLabel: customPlan.riskLabel,
+          description: customPlan.riskReason,
+        }
+      : baseDateConfig
     const outfitConfig = outfitConfigs[outfit]
     const giftConfig = giftConfigs[gift]
     const timeConfig = timeConfigs[timeSlot]
@@ -547,6 +938,8 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
     const totalTrust = finalStats.trust + giftConfig.trust
     const totalSecrecy = finalStats.secrecy + dateConfig.secrecyImpact + (outfitConfig.riskMod * -3) + (timeConfig.riskMod * -3)
     const totalMood = finalStats.mood
+    const isSpotted = spotted || finalStats.secrecy <= -14 || (dateConfig.risk >= 5 && Math.random() < 0.42)
+    if (isSpotted && !spotted) setSpotted(true)
 
     const score = Math.max(0, Math.min(100, 50 + totalAffection * 2 + totalTrust + totalMood - Math.abs(totalSecrecy)))
     setDateScore(Math.round(score))
@@ -556,11 +949,14 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
     if (totalTrust !== 0) statChanges.trust = totalTrust
     if (totalSecrecy !== 0) statChanges.secrecy = totalSecrecy
     if (totalMood !== 0) statChanges.mood = totalMood
-    if (spotted) {
-      statChanges.fanSuspicion = 15
-      statChanges.publicHeat = 10
+    statChanges.paparazziAttention = Math.max(1, Math.ceil(dateConfig.risk * 1.8))
+    statChanges.companyAlert = Math.max(0, dateConfig.risk - 2)
+    if (isSpotted) {
+      statChanges.fanSuspicion = 12 + dateConfig.risk * 3
+      statChanges.publicHeat = 8 + dateConfig.risk * 2
+      statChanges.companyAlert = (statChanges.companyAlert || 0) + 8
     }
-    if (giftConfig.fanSuspicion > 0 && spotted) {
+    if (giftConfig.fanSuspicion > 0 && isSpotted) {
       statChanges.fanSuspicion = (statChanges.fanSuspicion || 0) + giftConfig.fanSuspicion
     }
 
@@ -568,7 +964,7 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
 
     const dateTypeName = dateConfig.name
     updateBoyfriendMemory({
-      keyMemories: [...maleLead.memory.keyMemories, `第${useGameStore.getState().week}周${dateTypeName}：${spotted ? '被发现了！' : '顺利结束'}`],
+      keyMemories: [...maleLead.memory.keyMemories, `第${useGameStore.getState().week}周${dateTypeName}：${isSpotted ? '被发现了！' : '顺利结束'}`],
     })
 
     addHistoryEntry({
@@ -577,10 +973,10 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
       event: dateTypeName,
       choice: `好感${totalAffection > 0 ? '+' : ''}${totalAffection} 信任${totalTrust > 0 ? '+' : ''}${totalTrust} 保密${totalSecrecy > 0 ? '+' : ''}${totalSecrecy}`,
       consequences: statChanges,
-      memoryTags: [dateTypeName, spotted ? '被发现' : '安全'],
+      memoryTags: [dateTypeName, isSpotted ? '被发现' : '安全'],
     })
 
-    if (spotted) {
+    if (isSpotted) {
       const evidence: EvidenceFragment = {
         id: `ev_${Date.now()}`,
         title: `${dateTypeName}目击证据`,
@@ -595,11 +991,132 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
       addEvidence(evidence)
     }
 
-    if (dateConfig.risk >= 3 && Math.random() > 0.4) {
+    const shouldAddPhoto = isSpotted || (dateConfig.risk >= 3 && Math.random() > 0.25)
+    if (shouldAddPhoto) {
       setPhotosAdded(true)
     }
+    const snapshot = useGameStore.getState()
+    const round = (snapshot.week - 1) * 7 + snapshot.day
+    const calendarEvent: CalendarEvent = {
+      id: `cal_date_${Date.now()}`,
+      title: `${dateTypeName}${isSpotted ? '（疑似被目击）' : ''}`,
+      date: `W${snapshot.week}-D${snapshot.day}`,
+      time: timeConfigs[timeSlot].label,
+      type: 'shared',
+      isHighRisk: dateConfig.risk >= 3,
+      isCompleted: true,
+    }
+    const trace: Trace = {
+      id: `trace_date_${Date.now()}`,
+      type: 'date_result',
+      description: `${dateTypeName}结束：${isSpotted ? '被看见，开始产生外部证据。' : '暂时安全，但留下了相册和日程痕迹。'}`,
+      round,
+      appId: 'calendar',
+      screenshotBeforeDelete: isSpotted,
+      createdAt: Date.now(),
+    }
+    const photo: GalleryPhoto | null = shouldAddPhoto ? {
+      id: `photo_date_${Date.now()}`,
+      title: `${dateTypeName}后的照片`,
+      description: isSpotted
+        ? '一张本来只想留给自己的照片，背景和时间却足够被粉丝放大。'
+        : '只有你们知道含义的照片。甜蜜，但仍然是可被发现的痕迹。',
+      riskLevel: dateConfig.risk >= 5 ? 'high' : dateConfig.risk >= 3 ? 'medium' : 'low',
+      source: 'date',
+      isHidden: !isSpotted,
+      isDeleted: false,
+      isDiscoveredByFans: isSpotted,
+      relatedEventChainId: isSpotted ? 'fan_digging' : undefined,
+      createdAt: Date.now(),
+    } : null
+    const delayedConsequences: DelayedConsequence[] = [
+      {
+        id: `dc_date_fan_${Date.now()}`,
+        triggerRound: round + 1,
+        type: 'fan_timeline',
+        eventId: `${selectedDateType}_aftershock`,
+        content: selectedDateType === 'custom' && customPlan ? customPlan.delayedConsequence : `${dateTypeName}留下的时间线开始被粉丝复盘。`,
+        statChanges: { fanSuspicion: 5 + dateConfig.risk, publicHeat: isSpotted ? 4 : 1 },
+        isTriggered: false,
+      },
+    ]
+    if (dateConfig.risk >= 4 || isSpotted) {
+      delayedConsequences.push({
+        id: `dc_date_dispatch_${Date.now()}`,
+        triggerRound: round + 2,
+        type: 'dispatch_tip',
+        eventId: `${selectedDateType}_route`,
+        content: `${dateTypeName}附近出现重复动线，狗仔开始交叉验证车牌、CCTV 和粉丝路透。`,
+        statChanges: { paparazziAttention: 6 + dateConfig.risk, paparazziHeat: 6 + dateConfig.risk * 2, companyAlert: 4 },
+        isTriggered: false,
+      })
+    }
+    const notification: Notification = {
+      id: `notif_date_${Date.now()}`,
+      app: isSpotted ? 'weverse' : 'gallery',
+      title: isSpotted ? '约会目击开始发酵' : '约会痕迹已保存',
+      content: isSpotted ? '粉丝和狗仔都会从这次约会里拿到东西。' : '相册和日程已经留下甜蜜但危险的痕迹。',
+      urgency: isSpotted ? 'high' : 'medium',
+      isRead: false,
+      createdAt: Date.now(),
+    }
+    useGameStore.setState((state) => {
+      const hiddenRiskChanges = {
+        paparazziHeat: dateConfig.risk * 4 + (isSpotted ? 14 : 3),
+        lovestagramScore: dateConfig.risk * 3 + (totalAffection > 10 ? 5 : 0),
+        coupleItemScore: gift !== 'none' || outfit === 'dressup' ? 6 : 1,
+        timelineOverlap: dateConfig.risk * 4 + (timeSlot === 'evening' ? 4 : 0),
+        insiderLeakRisk: dateConfig.id === 'backdoor' || dateConfig.id === 'studio' || dateConfig.id === 'brandparty' ? 8 : 2,
+      }
+      const hiddenRisk = { ...state.hiddenRisk }
+      for (const [key, value] of Object.entries(hiddenRiskChanges)) {
+        const riskKey = key as keyof typeof hiddenRisk
+        hiddenRisk[riskKey] = Math.max(0, Math.min(100, hiddenRisk[riskKey] + value))
+      }
+      return {
+        calendar: { ...state.calendar, events: [...state.calendar.events, calendarEvent] },
+        gallery: photo ? { ...state.gallery, photos: [...state.gallery.photos, photo] } : state.gallery,
+        traces: [...state.traces, trace],
+        hiddenRisk,
+        delayedConsequences: [...state.delayedConsequences, ...delayedConsequences],
+        notifications: [...state.notifications, notification],
+        weverse: isSpotted ? {
+          ...state.weverse,
+          posts: [
+            ...state.weverse.posts,
+            {
+              id: `wv_date_${Date.now()}`,
+              type: 'analysis',
+              author: 'late_night_zip',
+              title: '어제 목격담 이거 맞아?',
+              content: `${dateTypeName}附近出现疑似目击。还没有清晰照片，但地点、时间和${state.maleLead.stageName}的空白行程对上了。`,
+              heat: Math.min(100, 45 + state.risk.fanSuspicion + dateConfig.risk * 6),
+              comments: 180 + dateConfig.risk * 40,
+              isPlayerAlt: false,
+              relatedEvidenceIds: state.evidenceFragments.slice(-4).map((e) => e.id),
+              createdAt: Date.now(),
+            },
+          ],
+        } : state.weverse,
+        dispatch: dateConfig.risk >= 4 ? {
+          ...state.dispatch,
+          tips: [
+            ...state.dispatch.tips,
+            {
+              id: `dp_date_${Date.now()}`,
+              type: isSpotted ? 'blur_photo' : 'clue',
+              content: isSpotted ? `${dateTypeName}附近流出一张模糊背影，正在确认身份。` : `${dateTypeName}动线被记录，暂时还缺决定性照片。`,
+              heatLevel: Math.min(100, 30 + state.risk.paparazziAttention + dateConfig.risk * 8),
+              createdAt: Date.now(),
+            },
+          ],
+        } : state.dispatch,
+      }
+    })
 
-    const postMsg = postDateMessages[selectedDateType]
+    const postMsg = selectedDateType === 'custom' && customPlan
+      ? { ko: customPlan.afterMessageKo, zh: customPlan.afterMessageZh }
+      : postDateMessages[selectedDateType]
     const replyMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
       sender: 'boyfriend',
@@ -822,6 +1339,43 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
                 </div>
               </div>
 
+              {selectedDateType === 'custom' && (
+                <div className="mb-5">
+                  <p className="text-white/50 text-xs mb-2">自定义约会描述</p>
+                  <textarea
+                    value={customIdea}
+                    onChange={(e) => {
+                      setCustomIdea(e.target.value)
+                      setCustomError('')
+                    }}
+                    placeholder="例如：想在打歌结束后的地下停车场见他十分钟，他戴着帽子，我故意把同款戒指露出来..."
+                    className="w-full h-24 px-3 py-2 rounded-xl text-sm outline-none resize-none"
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'white',
+                    }}
+                  />
+                  <div
+                    className="mt-2 px-3 py-2 rounded-lg"
+                    style={{
+                      background: 'rgba(168,85,247,0.08)',
+                      border: '1px solid rgba(168,85,247,0.15)',
+                    }}
+                  >
+                    <p className="text-purple-200 text-[10px]">
+                      LLM 会按地点公开程度、CCTV、粉丝密度、公司动线、同款和延迟后果判定风险。
+                    </p>
+                    {customIdea.trim() && (
+                      <p className="text-white/45 text-[10px] mt-1">
+                        本地预判：{estimateCustomRisk(customIdea).label} · {estimateCustomRisk(customIdea).reason}
+                      </p>
+                    )}
+                    {customError && <p className="text-orange-300 text-[10px] mt-1">{customError}</p>}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setPhase('request')}
@@ -836,14 +1390,15 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
                 </button>
                 <button
                   onClick={handleStartDate}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold"
+                  disabled={isGeneratingCustom}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50"
                   style={{
                     background: 'linear-gradient(135deg, #ff2d78, #ff6b9d)',
                     color: 'white',
                     boxShadow: '0 0 15px rgba(255,45,120,0.3)',
                   }}
                 >
-                  出发约会
+                  {isGeneratingCustom ? '生成中...' : '出发约会'}
                 </button>
               </div>
             </div>
@@ -1081,8 +1636,8 @@ export default function DateSystem({ isOpen, onClose }: DateSystemProps) {
               >
                 <p className="text-white/50 text-xs mb-2">他的约会后消息</p>
                 <TranslateText
-                  ko={selectedDateType ? postDateMessages[selectedDateType].ko : ''}
-                  zh={selectedDateType ? postDateMessages[selectedDateType].zh : ''}
+                  ko={selectedDateType === 'custom' && customPlan ? customPlan.afterMessageKo : selectedDateType ? postDateMessages[selectedDateType].ko : ''}
+                  zh={selectedDateType === 'custom' && customPlan ? customPlan.afterMessageZh : selectedDateType ? postDateMessages[selectedDateType].zh : ''}
                   koStyle={{ fontSize: '13px' }}
                 />
               </div>

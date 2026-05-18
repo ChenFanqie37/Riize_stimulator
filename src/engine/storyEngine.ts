@@ -198,7 +198,7 @@ export function processWeekStart(state: GameState): Partial<GameState> {
     player: {
       ...state.player,
       money: newMoney,
-      actionPoints: 3
+      actionPoints: 4
     },
     risk: {
       ...state.risk,

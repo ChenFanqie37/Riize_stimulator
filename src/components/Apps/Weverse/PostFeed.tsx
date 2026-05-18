@@ -3,6 +3,7 @@ import { AlertTriangle, MessageCircle, Flame, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { WeversePostType, WeversePost } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
+import AppAccountBar from '../../Common/AppAccountBar'
 
 const typeConfig: Record<WeversePostType, { label: string; color: string; bg: string }> = {
   sugar: { label: '嗑糖', color: '#EC4899', bg: '#FDF2F8' },
@@ -170,6 +171,7 @@ export default function PostFeed() {
         <h1 className="text-white font-bold text-lg">Weverse</h1>
         <p className="text-white/70 text-[10px]">粉丝社区</p>
       </div>
+      <AppAccountBar app="weverse" />
 
       <div className="flex gap-1.5 px-3 py-2 overflow-x-auto border-b border-gray-100">
         <button

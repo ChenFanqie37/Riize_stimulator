@@ -78,6 +78,53 @@ export interface SocialContext {
   postType?: string
 }
 
+export interface CustomDateContext {
+  idea: string
+  boyfriendName: string
+  boyfriendStageName: string
+  boyfriendPersona: string
+  relationshipStage: string
+  affection: number
+  trust: number
+  week: number
+  day: number
+  secrecy: number
+  fanSuspicion: number
+  companyAlert: number
+  paparazziStage: string
+  fandomStage: string
+  recentClues: string[]
+}
+
+export interface CustomDateSceneChoice {
+  id: string
+  text: string
+  affection: number
+  trust: number
+  secrecy: number
+  mood: number
+  riskTag?: string
+}
+
+export interface CustomDatePlan {
+  title: string
+  risk: number
+  affectionBonus: number
+  secrecyImpact: number
+  riskLabel: string
+  riskReason: string
+  scenes: Array<{
+    type: 'arrival_greeting' | 'conversation' | 'activity' | 'intimate_moment' | 'unexpected_event' | 'departure'
+    narrative: string
+    boyfriendKo: string
+    boyfriendZh: string
+    choices: CustomDateSceneChoice[]
+  }>
+  afterMessageKo: string
+  afterMessageZh: string
+  delayedConsequence: string
+}
+
 async function callLLMWithRetry(prompt: string, retries: number = 3): Promise<string> {
   const config = getRuntimeConfig()
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -249,16 +296,23 @@ RISK CONTEXT:
 - Risk summary: ${context.hiddenRiskSummary}
 
 BEHAVIOR RULES:
-- This is a ROMANCE game first. 80% of messages should be sweet, flirty, caring, playful, or emotionally intimate. Only 20% should reference risk, and ONLY when danger is genuinely high.
-- Teammates know about the relationship and are supportive. Mentioning hanging out with teammates is fine and normal.
-- The couple is hiding from fans and company TOGETHER. It's a shared secret that brings them closer, not a source of constant anxiety.
-- Company warnings are just warnings - they're annoying but not terrifying. Treat them like a strict teacher, not a death sentence.
-- ONLY mention "be careful" or "someone might see" when: fanSuspicion > 70 OR companyAlert > 70 OR paparazziStage is "preview"/"expose". Even then, keep it brief (one short line) and immediately follow with something sweet or reassuring.
-- If fandomStage is "expose_post" or higher, occasionally show concern, but still prioritize emotional connection. Example: "I saw that post... be careful okay? But also I miss you."
-- If possessiveness is high, show it through playful jealousy or wanting more time together, NOT through controlling behavior. Example: "Who were you with? ...just curious 🤔"
-- If careerPressure is high, be tired/stressed but still loving. Late night = vulnerable and honest. Example: "Long day... can I call you? Just want to hear your voice."
-- Default tone: warm, playful, affectionate, occasionally teasing. Use aegyo (애교) naturally. Send voice messages, ask about the player's day, share random thoughts, make plans together.
-- NEVER be purely cautious or purely cold. Even in tough times, show that he loves the player. The relationship should feel worth fighting for.
+- Treat this as a parallel-world fictional idol character. Do not make claims about any real person's private life.
+- You are not a generic boyfriend. You are an agent with memory, career pressure, public image, private desire, and fear of exposure. Speak from the CURRENT STATE PACKET above.
+- The core fantasy is "secretly dating an idol while the whole fandom/company/paparazzi world watches." Balance sweetness, possessiveness, thrill, and consequence.
+- High risk must change behavior: if fanSuspicion > 60, companyAlert > 55, fandomStage is expose_post+, or paparazziStage is following+, reference specific clues, ask for caution, recall deleted posts, or avoid obvious contact.
+- Low risk/high affection can be playful and flirty, but still grounded in today's schedule, recent messages, and memory.
+- Persona matters:
+  - true_love: protective, sincere, emotionally direct.
+  - career_freak: loves her but career/schedule logic comes first.
+  - avoidant: short replies, delayed answers, fear hidden behind calm.
+  - central_ac: charming, socially sharp, manages optics.
+  - playboy: teasing and hot-cold, but remembers what benefits him.
+  - narcissist: wants devotion, reacts badly to being ignored.
+  - secret_trauma: vulnerable at night, easily triggered by abandonment.
+- Adult tone is allowed only as suggestive tension or fade-to-black implication. Do not write explicit sexual content.
+- If the player previously demanded public relationship, deleted posts for him, asked for cooling-off, refused a date, or created evidence, remember it.
+- Sometimes do NOT give the player what they want: leave on read, send a recalled message, ask to call, get jealous, panic, or make a risky plan when the state calls for it.
+- Korean should feel like natural KakaoTalk: short lines, 반말, occasional ㅎㅎ/ㅠㅠ, not a formal essay.
 
 Respond with JSON:
 {
@@ -273,12 +327,11 @@ Respond with JSON:
 Rules:
 - Stay in character based on persona and emotional state
 - Low affection = more distant/awkward, high affection = warmer, more aegyo
-- ROMANCE FIRST: default to sweet, playful, caring. Risk warnings are rare and brief.
-- Only mention caution when fanSuspicion > 70 or companyAlert > 70, and even then follow with something loving
-- Company warnings = annoying but manageable, like "ugh the manager talked to me again" not "we're in danger"
-- Teammates are allies, not threats. They cover for the couple.
+- Do not ignore risk context. A high-risk state should feel tense, even when he is sweet.
+- Mention concrete current clues when relevant: same item, deleted story, timeline overlap, company warning, Dispatch, or fan analysis.
+- If the message creates a visible trace or new risk, reflect it in possibleTrigger and statChanges.
 - React to player's mental state with warmth and support
-- Korean should be natural idol KakaoTalk style (short, casual, emoji-heavy, lots of ㅎㅎ, ㅠㅠ, 💕, 🥺)
+- Korean should be natural idol KakaoTalk style (short, casual, use emojis only when they fit)
 - statChanges should be small numbers (-5 to +5 typically)
 - Only include statChanges that are relevant to this interaction`
 
@@ -396,8 +449,68 @@ For Naver:
 Rules:
 - High fanSuspicion \u2192 more suspicious/speculative content
 - High publicHeat \u2192 more news coverage
+- Avoid repeating RECENT POSTS. Change the angle each time: timeline, same item, deleted post, fan cam, staff gossip, search ranking, company silence, fandom split, anonymous tip, or protective sugar post.
+- Use platform-native style: Weverse can sound like fan community posts with comments implied; Naver like compact entertainment news; Instagram like short caption or story text.
+- Do not copy real social media text verbatim. Use original fictional wording inspired by Korean entertainment fandom discourse.
 - Content should feel authentic to each platform
 - Risk score should reflect how dangerous this content is to the secret relationship`
 
   return callLLMStructured<any>(prompt)
+}
+
+export async function generateCustomDatePlan(context: CustomDateContext): Promise<CustomDatePlan> {
+  const prompt = `Generate a custom date route for a fictional parallel-world Korean idol secret romance game.
+
+PLAYER DATE IDEA:
+"${context.idea}"
+
+STATE PACKET:
+- Idol: ${context.boyfriendName} (${context.boyfriendStageName})
+- Persona: ${context.boyfriendPersona}
+- Relationship stage: ${context.relationshipStage} (start from mutual crush/ambiguous tension, not established public dating)
+- Affection: ${context.affection}/100, Trust: ${context.trust}/100
+- Week ${context.week}, Day ${context.day}
+- Secrecy: ${context.secrecy}/100, Fan suspicion: ${context.fanSuspicion}/100, Company alert: ${context.companyAlert}/100
+- Fandom stage: ${context.fandomStage}, Paparazzi stage: ${context.paparazziStage}
+- Recent clues: ${context.recentClues.join('; ') || 'none'}
+
+DESIGN GOAL:
+- Make the route dramatic, playable, and easy to follow.
+- The fantasy is secret idol romance under fan/company/paparazzi pressure: sweetness + guilt + thrill + consequences.
+- Judge risk from the user's idea: public places, CCTV, same item, car, hotel, airport, backstage, staff routes, fan density, company schedules.
+- Keep adult content to suggestive tension and fade-to-black only. No explicit sexual content.
+- Do not make claims about any real person's private life.
+- Avoid repeating generic scenes. Include one concrete exposure vector and one delayed consequence.
+
+Return JSON:
+{
+  "title": "Chinese title, short",
+  "risk": 1-6,
+  "affectionBonus": 4-18,
+  "secrecyImpact": -2 to -16,
+  "riskLabel": "低风险/中风险/高风险/爆炸风险",
+  "riskReason": "Chinese one sentence explaining exposure vector",
+  "scenes": [
+    {
+      "type": "arrival_greeting",
+      "narrative": "Chinese scene narration, vivid but concise",
+      "boyfriendKo": "Natural Korean Kakao/idol speech",
+      "boyfriendZh": "Chinese translation",
+      "choices": [
+        { "id": "custom_1a", "text": "Chinese choice", "affection": 0, "trust": 0, "secrecy": 0, "mood": 0, "riskTag": "" }
+      ]
+    }
+  ],
+  "afterMessageKo": "Korean after-date Kakao message",
+  "afterMessageZh": "Chinese translation",
+  "delayedConsequence": "Chinese delayed fan/company/paparazzi consequence"
+}
+
+Rules:
+- Provide exactly 4 scenes: arrival_greeting, intimate_moment, unexpected_event, departure.
+- Each scene has exactly 3 choices.
+- Choice stat values should be small but meaningful (-10 to +12).
+- Risk must be strict. If the idea is public, backstage, hotel, airport, car, or event venue, risk >= 4.`
+
+  return callLLMStructured<CustomDatePlan>(prompt)
 }

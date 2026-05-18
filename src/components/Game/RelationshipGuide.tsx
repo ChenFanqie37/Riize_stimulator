@@ -139,7 +139,7 @@ export default function RelationshipGuide({ isOpen, onClose }: RelationshipGuide
   const affection = state.maleLead.affection
   const trust = state.maleLead.trust
   const boyfriendName = state.maleLead.name
-  const bestieName = state.player.bestieName
+  const bestieName = state.player.bestieName || '闺蜜'
   const bestieThread = state.kakaoTalk.threads.find((t) => t.id === 'thread_bestie')
   const bestieMessageCount = bestieThread ? bestieThread.messages.length : 0
   const bestieIntimacy = Math.min(100, 30 + bestieMessageCount * 5)

@@ -321,6 +321,18 @@ export interface Notification {
   createdAt: number
 }
 
+export interface AppAccount {
+  app: AppName
+  displayName: string
+  handle: string
+  avatar: string
+  persona: string
+  accountType: 'main' | 'alt' | 'anonymous' | 'official' | 'private'
+  followers: number
+  riskNote: string
+  isAnonymous: boolean
+}
+
 export interface SaveData {
   id: string
   name: string
@@ -423,6 +435,7 @@ export interface GameState {
   narrativePhase: NarrativePhase
   relationshipStatus: RelationshipStatus
   notifications: Notification[]
+  appAccounts: Record<AppName, AppAccount>
   currentApp: AppName | null
   currentChatThreadId: string | null
   saves: SaveData[]

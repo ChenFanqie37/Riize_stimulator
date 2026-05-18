@@ -9,11 +9,267 @@ import type {
   CrisisLevel
 } from '../types/game'
 
+function rid(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+function clamp(value: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function currentRound(state: GameState): number {
+  return (state.week - 1) * 7 + state.day
+}
+
+function applyDelayedStatChanges(state: GameState, changes: Record<string, number>): GameState {
+  let updatedState = { ...state }
+  for (const [key, value] of Object.entries(changes)) {
+    if (!value) continue
+    if (key === 'affection') {
+      updatedState = { ...updatedState, maleLead: { ...updatedState.maleLead, affection: clamp(updatedState.maleLead.affection + value) } }
+    } else if (key === 'trust') {
+      updatedState = { ...updatedState, maleLead: { ...updatedState.maleLead, trust: clamp(updatedState.maleLead.trust + value) } }
+    } else if (key === 'careerPressure') {
+      updatedState = { ...updatedState, maleLead: { ...updatedState.maleLead, careerPressure: clamp(updatedState.maleLead.careerPressure + value) } }
+    } else if (key === 'mood') {
+      updatedState = { ...updatedState, player: { ...updatedState.player, mood: clamp(updatedState.player.mood + value) } }
+    } else if (key === 'money') {
+      updatedState = { ...updatedState, player: { ...updatedState.player, money: Math.max(0, updatedState.player.money + value) } }
+    } else if (key === 'lifeStability') {
+      updatedState = { ...updatedState, player: { ...updatedState.player, lifeStability: clamp(updatedState.player.lifeStability + value) } }
+    } else if (key === 'popularity') {
+      updatedState = { ...updatedState, player: { ...updatedState.player, popularity: clamp(updatedState.player.popularity + value) } }
+    } else if (key === 'secrecy') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, secrecy: clamp(updatedState.risk.secrecy + value) } }
+    } else if (key === 'companyAlert') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, companyAlert: clamp(updatedState.risk.companyAlert + value) } }
+    } else if (key === 'fanSuspicion') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, fanSuspicion: clamp(updatedState.risk.fanSuspicion + value) } }
+    } else if (key === 'publicHeat') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, publicHeat: clamp(updatedState.risk.publicHeat + value) } }
+    } else if (key === 'paparazziAttention') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, paparazziAttention: clamp(updatedState.risk.paparazziAttention + value) } }
+    } else if (key === 'evidenceCount') {
+      updatedState = { ...updatedState, risk: { ...updatedState.risk, evidenceCount: Math.max(0, updatedState.risk.evidenceCount + value) } }
+    } else if (key === 'stress' || key === 'anxiety') {
+      updatedState = { ...updatedState, health: { ...updatedState.health, stress: clamp(updatedState.health.stress + value) } }
+    } else if (key === 'mentalHealth') {
+      updatedState = { ...updatedState, health: { ...updatedState.health, mentalHealth: clamp(updatedState.health.mentalHealth + value) } }
+    } else if (key === 'sleep') {
+      updatedState = { ...updatedState, health: { ...updatedState.health, sleep: clamp(updatedState.health.sleep + value) } }
+    } else if (key in updatedState.hiddenRisk) {
+      updatedState = {
+        ...updatedState,
+        hiddenRisk: {
+          ...updatedState.hiddenRisk,
+          [key]: clamp(updatedState.hiddenRisk[key as keyof GameState['hiddenRisk']] + value),
+        },
+      }
+    }
+  }
+  return updatedState
+}
+
+function materializeDelayedConsequence(state: GameState, dc: DelayedConsequence): GameState {
+  let updatedState = state
+  const baseNotification = {
+    id: rid('notif_delay'),
+    isRead: false,
+    createdAt: Date.now(),
+  }
+
+  if (dc.type === 'weverse_analysis') {
+    const relatedEvidenceIds = updatedState.evidenceFragments.slice(-3).map((e) => e.id)
+    updatedState = {
+      ...updatedState,
+      weverse: {
+        ...updatedState.weverse,
+        posts: [
+          ...updatedState.weverse.posts,
+          {
+            id: rid('wv_delay'),
+            type: 'analysis',
+            author: 'time_line_zip',
+            title: '시간 지나고 보니까 더 이상해',
+            content: `${dc.content} 评论区开始有人对比时间点、地点和同款物品。有人说别造谣，也有人说“越看越不对”。`,
+            heat: clamp(35 + updatedState.risk.fanSuspicion + updatedState.risk.evidenceCount * 4),
+            comments: 96 + updatedState.risk.fanSuspicion,
+            isPlayerAlt: false,
+            relatedEvidenceIds,
+            createdAt: Date.now(),
+          },
+        ],
+      },
+      notifications: [
+        ...updatedState.notifications,
+        { ...baseNotification, app: 'weverse', title: '延迟后果：分析帖出现', content: dc.content, urgency: 'high' },
+      ],
+    }
+  } else if (dc.type === 'fan_timeline') {
+    const timeline = generateFanTimeline({ ...updatedState, risk: { ...updatedState.risk, fanSuspicion: Math.max(updatedState.risk.fanSuspicion, 55) } })
+    if (timeline) {
+      updatedState = {
+        ...updatedState,
+        weverse: {
+          ...updatedState.weverse,
+          timeline: [...updatedState.weverse.timeline, timeline],
+          posts: [
+            ...updatedState.weverse.posts,
+            {
+              id: rid('wv_timeline'),
+              type: 'timeline',
+              author: 'archive_briize',
+              title: '최근 한 달 타임라인 정리',
+              content: `${dc.content} 我把能看到的公开信息整理了一下，不下结论，大家自己判断。`,
+              heat: timeline.heat,
+              comments: 140 + updatedState.risk.fanSuspicion,
+              isPlayerAlt: false,
+              relatedEvidenceIds: updatedState.evidenceFragments.slice(-5).map((e) => e.id),
+              createdAt: Date.now(),
+            },
+          ],
+        },
+        notifications: [
+          ...updatedState.notifications,
+          { ...baseNotification, app: 'weverse', title: '粉丝扒皮时间线更新', content: dc.content, urgency: 'high' },
+        ],
+      }
+    }
+  } else if (dc.type === 'naver_news') {
+    updatedState = {
+      ...updatedState,
+      naver: {
+        ...updatedState.naver,
+        news: [
+          ...updatedState.naver.news,
+          {
+            id: rid('nv_delay'),
+            title: `${updatedState.maleLead.stageName} 관련 열애설 재점화`,
+            summary: `${dc.content} 多个粉丝社区出现整理帖后，相关搜索词开始上升。所属社暂未回应。`,
+            source: '스포츠경향',
+            heat: clamp(45 + updatedState.risk.publicHeat + updatedState.risk.fanSuspicion * 0.4),
+            relatedSearchWords: [updatedState.maleLead.stageName, '열애설', '타임라인', '소속사'],
+            createdAt: Date.now(),
+          },
+        ],
+      },
+      notifications: [
+        ...updatedState.notifications,
+        { ...baseNotification, app: 'naver', title: 'Naver 新闻跟进', content: dc.content, urgency: 'high' },
+      ],
+    }
+  } else if (dc.type === 'company_warning') {
+    updatedState = {
+      ...updatedState,
+      companyNotice: {
+        ...updatedState.companyNotice,
+        notices: [
+          ...updatedState.companyNotice.notices,
+          {
+            id: rid('cn_delay'),
+            level: updatedState.risk.companyAlert > 75 ? 'summon' : 'warning',
+            title: updatedState.risk.companyAlert > 75 ? '면담 요청' : 'SNS 및 사적 동선 관리',
+            content: `${dc.content} 公司要求回归期减少私人联系，避免任何可以被粉丝解读的公开痕迹。`,
+            isRead: false,
+            createdAt: Date.now(),
+          },
+        ],
+      },
+      notifications: [
+        ...updatedState.notifications,
+        { ...baseNotification, app: 'companyNotice', title: '公司风控介入', content: dc.content, urgency: 'high' },
+      ],
+    }
+  } else if (dc.type === 'dispatch_tip') {
+    updatedState = {
+      ...updatedState,
+      dispatch: {
+        ...updatedState.dispatch,
+        tips: [
+          ...updatedState.dispatch.tips,
+          {
+            id: rid('dp_delay'),
+            type: updatedState.risk.paparazziAttention > 65 ? 'countdown' : 'clue',
+            content: dc.content,
+            heatLevel: clamp(30 + updatedState.risk.paparazziAttention + updatedState.hiddenRisk.paparazziHeat),
+            createdAt: Date.now(),
+          },
+        ],
+      },
+      notifications: [
+        ...updatedState.notifications,
+        { ...baseNotification, app: 'dispatch', title: 'Dispatch 线索板更新', content: dc.content, urgency: 'high' },
+      ],
+    }
+  } else if (dc.type === 'boyfriend_followup') {
+    updatedState = {
+      ...updatedState,
+      kakaoTalk: {
+        ...updatedState.kakaoTalk,
+        threads: updatedState.kakaoTalk.threads.map((thread) =>
+          thread.id === 'thread_boyfriend'
+            ? {
+                ...thread,
+                unreadCount: thread.unreadCount + 1,
+                lastActive: '刚刚',
+                messages: [
+                  ...thread.messages,
+                  {
+                    id: rid('msg_delay'),
+                    sender: 'boyfriend',
+                    senderName: updatedState.maleLead.name,
+                    textKo: dc.eventId.includes('silence') ? '봤어. 답은 못 하겠어.' : '아까 보낸 거... 못 본 척해줘.',
+                    textZh: dc.eventId.includes('silence') ? '我看到了。但我没办法回复。' : '刚才发的那条……你当没看到吧。',
+                    timestamp: Date.now(),
+                    isRead: false,
+                    isRecalled: dc.eventId.includes('break_ice'),
+                    emotion: dc.eventId.includes('silence') ? 'avoidant' : 'vulnerable',
+                    category: 'emotional',
+                  },
+                ],
+              }
+            : thread
+        ),
+      },
+      notifications: [
+        ...updatedState.notifications,
+        { ...baseNotification, app: 'kakaoTalk', title: '他终于有反应了', content: dc.content, urgency: 'high' },
+      ],
+    }
+  }
+
+  updatedState = {
+    ...updatedState,
+    history: [
+      ...updatedState.history,
+      {
+        id: rid('hist_delay'),
+        week: updatedState.week,
+        day: updatedState.day,
+        event: '延迟后果',
+        choice: dc.content,
+        consequences: dc.statChanges,
+        memoryTags: [dc.type, dc.eventId],
+        createdAt: Date.now(),
+      },
+    ],
+    maleLead: {
+      ...updatedState.maleLead,
+      memory: {
+        ...updatedState.maleLead.memory,
+        keyMemories: [...updatedState.maleLead.memory.keyMemories.slice(-18), `延迟后果：${dc.content}`],
+      },
+    },
+  }
+  return updatedState
+}
+
 export function processDelayedConsequences(state: GameState): { state: GameState; triggered: DelayedConsequence[] } {
   const triggered: DelayedConsequence[] = []
+  const round = currentRound(state)
   const updatedConsequences = state.delayedConsequences.map(dc => {
     if (dc.isTriggered) return dc
-    if (state.week >= dc.triggerRound) {
+    if (round >= dc.triggerRound) {
       triggered.push({ ...dc, isTriggered: true })
       return { ...dc, isTriggered: true }
     }
@@ -21,79 +277,8 @@ export function processDelayedConsequences(state: GameState): { state: GameState
   })
   let updatedState = { ...state, delayedConsequences: updatedConsequences }
   for (const dc of triggered) {
-    const changes = dc.statChanges
-    if (changes.affection !== undefined) {
-      updatedState = {
-        ...updatedState,
-        maleLead: {
-          ...updatedState.maleLead,
-          affection: Math.max(0, Math.min(100, updatedState.maleLead.affection + changes.affection))
-        }
-      }
-    }
-    if (changes.trust !== undefined) {
-      updatedState = {
-        ...updatedState,
-        maleLead: {
-          ...updatedState.maleLead,
-          trust: Math.max(0, Math.min(100, updatedState.maleLead.trust + changes.trust))
-        }
-      }
-    }
-    if (changes.mood !== undefined) {
-      updatedState = {
-        ...updatedState,
-        player: {
-          ...updatedState.player,
-          mood: Math.max(0, Math.min(100, updatedState.player.mood + changes.mood))
-        }
-      }
-    }
-    if (changes.secrecy !== undefined) {
-      updatedState = {
-        ...updatedState,
-        risk: {
-          ...updatedState.risk,
-          secrecy: Math.max(0, Math.min(100, updatedState.risk.secrecy + changes.secrecy))
-        }
-      }
-    }
-    if (changes.companyAlert !== undefined) {
-      updatedState = {
-        ...updatedState,
-        risk: {
-          ...updatedState.risk,
-          companyAlert: Math.max(0, Math.min(100, updatedState.risk.companyAlert + changes.companyAlert))
-        }
-      }
-    }
-    if (changes.fanSuspicion !== undefined) {
-      updatedState = {
-        ...updatedState,
-        risk: {
-          ...updatedState.risk,
-          fanSuspicion: Math.max(0, Math.min(100, updatedState.risk.fanSuspicion + changes.fanSuspicion))
-        }
-      }
-    }
-    if (changes.publicHeat !== undefined) {
-      updatedState = {
-        ...updatedState,
-        risk: {
-          ...updatedState.risk,
-          publicHeat: Math.max(0, Math.min(100, updatedState.risk.publicHeat + changes.publicHeat))
-        }
-      }
-    }
-    if (changes.careerPressure !== undefined) {
-      updatedState = {
-        ...updatedState,
-        maleLead: {
-          ...updatedState.maleLead,
-          careerPressure: Math.max(0, Math.min(100, updatedState.maleLead.careerPressure + changes.careerPressure))
-        }
-      }
-    }
+    updatedState = applyDelayedStatChanges(updatedState, dc.statChanges)
+    updatedState = materializeDelayedConsequence(updatedState, dc)
   }
   return { state: updatedState, triggered }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Search, Pin, Phone, Trash2, MoreVertical } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
+import AppAccountBar from '../../Common/AppAccountBar'
 
 const avatarColors = [
   '#FEE500', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
@@ -23,6 +24,7 @@ const relationshipLabels: Record<string, { text: string; color: string }> = {
   confirmed: { text: '已确认', color: 'rgba(244,114,182,0.8)' },
   passionate: { text: '热恋', color: 'rgba(248,113,113,0.8)' },
   trial: { text: '考验期', color: 'rgba(168,85,247,0.8)' },
+  '暗生情愫': { text: '暗生情愫', color: 'rgba(96,165,250,0.8)' },
   '闺蜜': { text: '闺蜜', color: 'rgba(244,114,182,0.8)' },
 }
 
@@ -72,6 +74,7 @@ export default function ChatList({ onOpenCallLog }: { onOpenCallLog: () => void 
           />
         </div>
       </div>
+      <AppAccountBar app="kakaoTalk" />
 
       <div className="flex-1 overflow-y-auto">
         {filtered.map((thread) => {

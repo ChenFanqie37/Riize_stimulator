@@ -11,6 +11,21 @@ const typeColors: Record<CalendarEvent['type'], { bg: string; text: string; dot:
   shared: { bg: '#FEF2F2', text: '#EF4444', dot: '#EF4444' },
 }
 
+function getEventDayIndex(date: string): number {
+  const weekDay = date.match(/W\d+-D(\d+)/i)
+  if (weekDay) return Math.max(0, Math.min(6, Number(weekDay[1]) - 1))
+
+  const chineseDay = date.match(/第(\d+)天/)
+  if (chineseDay) return Math.max(0, Math.min(6, Number(chineseDay[1]) - 1))
+
+  const parsed = new Date(date)
+  if (!Number.isNaN(parsed.getTime())) {
+    const day = parsed.getDay()
+    return day === 0 ? 6 : day - 1
+  }
+  return 0
+}
+
 export default function Schedule() {
   const events = useGameStore((s) => s.calendar.events)
   const week = useGameStore((s) => s.week)
@@ -26,10 +41,7 @@ export default function Schedule() {
   }
 
   const eventsByDay = dayLabels.map((_, i) =>
-    events.filter((e) => {
-      const dayNum = new Date(e.date).getDay()
-      return dayNum === (i === 6 ? 0 : i + 1)
-    })
+    events.filter((e) => getEventDayIndex(e.date) === i)
   )
 
   return (

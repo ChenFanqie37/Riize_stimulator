@@ -42,7 +42,7 @@ export default function CharacterCreation() {
   const createGame = useGameStore((s) => s.createGame)
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
-  const [bestieName, setBestieName] = useState('智恩')
+  const [bestieName, setBestieName] = useState('')
   const [age, setAge] = useState(22)
   const [identity, setIdentity] = useState<PlayerIdentity | null>(null)
   const [memberId, setMemberId] = useState<RIIZEMember | null>(null)
@@ -65,7 +65,7 @@ export default function CharacterCreation() {
     if (!identity || !memberId) return
     createGame({
       playerName: name.trim(),
-      bestieName: bestieName.trim() || '智恩',
+      bestieName: bestieName.trim(),
       playerAge: age,
       identity,
       fanLevel,
@@ -134,7 +134,7 @@ export default function CharacterCreation() {
                 type="text"
                 value={bestieName}
                 onChange={(e) => setBestieName(e.target.value)}
-                placeholder="输入闺蜜名字（默认：智恩）"
+                placeholder="可选，不填则显示为闺蜜"
                 className="w-full px-4 py-3 rounded-xl bg-white border border-black/8 text-[#1C1C1E] placeholder-[#8E8E93]/40 outline-none focus:border-[#007AFF]/50 transition-colors"
               />
             </div>
