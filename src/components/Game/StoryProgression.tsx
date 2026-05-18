@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, BookOpen, Heart, AlertTriangle, Flame, Moon, ChevronRight, Check } from 'lucide-react'
+import { X, BookOpen, Heart, AlertTriangle, Flame, Moon, ChevronRight, Check, Maximize2 } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { getIdentityStory, getIdentityEvents, getIdentityEndings } from '@/data/storyData'
 import type { StoryEvent, IdentityEnding } from '@/data/storyData'
+import NarrativeReader from './NarrativeReader'
 
 interface StoryProgressionProps {
   isOpen: boolean
   onClose: () => void
+  onOpenNarrativeMode?: () => void
 }
 
 const eventTypeConfig = {
@@ -16,16 +18,17 @@ const eventTypeConfig = {
   dark: { color: '#a855f7', bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.3)', icon: Moon, label: '黑暗' },
 }
 
-export default function StoryProgression({ isOpen, onClose }: StoryProgressionProps) {
+export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode }: StoryProgressionProps) {
   const state = useGameStore()
   const addNotification = useGameStore((s) => s.addNotification)
   const updateStats = useGameStore((s) => s.updateStats)
   const addHistoryEntry = useGameStore((s) => s.addHistoryEntry)
+  const advanceTime = useGameStore((s) => s.advanceTime)
 
   const [displayedNarrative, setDisplayedNarrative] = useState<string[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<StoryEvent | null>(null)
-  const [activeTab, setActiveTab] = useState<'events' | 'progress' | 'endings'>('events')
+  const [activeTab, setActiveTab] = useState<'reader' | 'events' | 'progress' | 'endings'>('reader')
   const narrativeRef = useRef<HTMLDivElement>(null)
 
   const identity = state.player.identity
@@ -94,6 +97,7 @@ export default function StoryProgression({ isOpen, onClose }: StoryProgressionPr
     if (!choice) return
 
     updateStats(choice.statChanges)
+    advanceTime(4)
     addHistoryEntry({
       week: state.week,
       day: state.day,
@@ -102,6 +106,47 @@ export default function StoryProgression({ isOpen, onClose }: StoryProgressionPr
       consequences: choice.statChanges,
       memoryTags: [`story_${event.id}_choice_${choiceId}`],
     })
+    if ((choice.statChanges.fanSuspicion || 0) > 0 || (choice.statChanges.publicHeat || 0) > 0) {
+      useGameStore.setState((current) => ({
+        weverse: {
+          ...current.weverse,
+          posts: [
+            ...current.weverse.posts,
+            {
+              id: `wv_story_after_${Date.now()}`,
+              type: 'analysis',
+              author: 'plot_watcher',
+              title: '오늘 흐름이 좀 바뀐 것 같아',
+              content: `剧情事件“${event.title}”之后，粉圈开始把新的选择后果接进时间线。有人说只是巧合，也有人开始等下一张图。`,
+              heat: Math.min(100, 38 + current.risk.fanSuspicion + (choice.statChanges.publicHeat || 0)),
+              comments: 80 + Math.floor(current.risk.publicHeat * 1.2),
+              isPlayerAlt: false,
+              relatedEvidenceIds: current.evidenceFragments.slice(-2).map((e) => e.id),
+              createdAt: Date.now(),
+            },
+          ],
+        },
+      }))
+      addNotification({
+        id: `story_after_${Date.now()}`,
+        app: 'weverse',
+        title: '剧情后果发酵',
+        content: '你的选择已经进入粉圈讨论，会在后续事件里继续发酵。',
+        urgency: 'medium',
+        isRead: false,
+        createdAt: Date.now(),
+      })
+    } else if ((choice.statChanges.affection || 0) > 0 || (choice.statChanges.trust || 0) > 0) {
+      addNotification({
+        id: `story_soft_${Date.now()}`,
+        app: 'kakaoTalk',
+        title: '关系后果已记录',
+        content: '这次选择会影响他之后的语气、记忆和主动性。',
+        urgency: 'low',
+        isRead: false,
+        createdAt: Date.now(),
+      })
+    }
     setSelectedEvent(null)
   }
 
@@ -148,12 +193,23 @@ export default function StoryProgression({ isOpen, onClose }: StoryProgressionPr
             <BookOpen size={20} className="text-purple-400" />
             <h2 className="text-purple-300 font-bold text-lg">剧情</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-          >
-            <X size={14} className="text-white/70" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenNarrativeMode && (
+              <button
+                onClick={onOpenNarrativeMode}
+                className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                title="进入独立文游模式"
+              >
+                <Maximize2 size={14} className="text-white/70" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+            >
+              <X size={14} className="text-white/70" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -205,7 +261,7 @@ export default function StoryProgression({ isOpen, onClose }: StoryProgressionPr
           )}
 
           <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-            {(['events', 'progress', 'endings'] as const).map(tab => (
+            {(['reader', 'events', 'progress', 'endings'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -215,10 +271,16 @@ export default function StoryProgression({ isOpen, onClose }: StoryProgressionPr
                   color: activeTab === tab ? '#c084fc' : 'rgba(255,255,255,0.4)',
                 }}
               >
-                {tab === 'events' ? '事件' : tab === 'progress' ? '进度' : '结局'}
+                {tab === 'reader' ? '正文' : tab === 'events' ? '事件' : tab === 'progress' ? '进度' : '结局'}
               </button>
             ))}
           </div>
+
+          {activeTab === 'reader' && (
+            <div className="relative overflow-hidden rounded-2xl bg-white">
+              <NarrativeReader source="story_panel" compact />
+            </div>
+          )}
 
           {activeTab === 'events' && storyEvents && (
             <div className="space-y-3">

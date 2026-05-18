@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server/dev.js",
+    "dev:client": "vite",
+    "server": "node server/proxy.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "node server/proxy.js",
     "check": "tsc -b --noEmit"
   },
   "dependencies": {

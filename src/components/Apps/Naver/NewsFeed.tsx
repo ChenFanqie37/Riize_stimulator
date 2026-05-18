@@ -1,42 +1,23 @@
 import { useState } from 'react'
 import { Search, TrendingUp, Clock, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
-import type { NaverNews } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 import AppAccountBar from '../../Common/AppAccountBar'
+import { commentsForNaverNews, type SocialAgentComment } from '@/engine/socialAgents'
 
-function generateNewsComments(article: NaverNews, fanSuspicion: number): { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] {
-  const comments: { author: string; text: string; stance: 'curious' | 'defensive' | 'critical' | 'neutral' }[] = []
-
-  comments.push({ author: 'netizen_1', text: '이 기사 뭔가 석연찮은데?', stance: 'curious' })
-  comments.push({ author: 'riize_shield', text: '아이돌 사생활 존중해주세요', stance: 'defensive' })
-  comments.push({ author: 'real_talk', text: '연예인 연애는 원래 이렇게 시작됨', stance: 'neutral' })
-
-  if (article.heat > 60) {
-    comments.push({ author: 'critic_99', text: '또 연애 스캔들? 요즘 아이돌들은...', stance: 'critical' })
-    comments.push({ author: 'fan_union', text: '팬들 멘탈 챙겨주세요 ㅠㅠ', stance: 'defensive' })
-  }
-
-  if (fanSuspicion > 50) {
-    comments.push({ author: 'detective_kr', text: '이 타이밍에 이 기사가 나온 건 우연이 아니다', stance: 'curious' })
-  }
-
-  comments.push({ author: 'casual_reader', text: '그냥 기사 하나일 뿐인데 오버반응 ㄱㄱ', stance: 'neutral' })
-
-  return comments.slice(0, 6)
-}
-
-const naverStanceConfig: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  curious: { label: '好奇', color: '#D97706', bg: '#FFFBEB', icon: '🤔' },
-  defensive: { label: '维护', color: '#16A34A', bg: '#F0FDF4', icon: '🛡️' },
-  critical: { label: '批评', color: '#DC2626', bg: '#FEF2F2', icon: '❌' },
-  neutral: { label: '中立', color: '#6B7280', bg: '#F9FAFB', icon: '💬' },
+const roleConfig: Record<SocialAgentComment['role'], { label: string; color: string; bg: string }> = {
+  fan: { label: '粉丝', color: '#16A34A', bg: '#F0FDF4' },
+  anti: { label: '黑粉', color: '#DC2626', bg: '#FEF2F2' },
+  passerby: { label: '路人', color: '#6B7280', bg: '#F9FAFB' },
+  company: { label: '公司', color: '#2563EB', bg: '#EFF6FF' },
+  paparazzi: { label: '狗仔', color: '#D97706', bg: '#FFFBEB' },
+  teammateFan: { label: '队友粉', color: '#8B5CF6', bg: '#F5F3FF' },
 }
 
 export default function NewsFeed() {
-  const news = useGameStore((s) => s.naver.news)
-  const searchHistory = useGameStore((s) => s.naver.searchHistory)
-  const fanSuspicion = useGameStore((s) => s.risk.fanSuspicion)
+  const state = useGameStore()
+  const news = state.naver.news
+  const searchHistory = state.naver.searchHistory
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null)
 
   const trendingKeywords = news
@@ -55,7 +36,7 @@ export default function NewsFeed() {
       setSelectedArticleId(null)
       return null
     }
-    const comments = generateNewsComments(article, fanSuspicion)
+    const comments = commentsForNaverNews(article, state)
     return (
       <div className="flex flex-col h-full bg-white">
         <div className="px-4 py-2.5 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #1AA300, #1EC800)' }}>
@@ -104,7 +85,7 @@ export default function NewsFeed() {
             <p className="text-xs font-semibold text-gray-700 mb-2">网友评论</p>
             <div className="flex flex-col gap-2">
               {comments.map((c, i) => {
-                const cfg = naverStanceConfig[c.stance]
+                const cfg = roleConfig[c.role]
                 return (
                   <div key={i} className="flex items-start gap-2">
                     <div
@@ -120,7 +101,7 @@ export default function NewsFeed() {
                           className="text-[9px] px-1 py-0.5 rounded font-medium"
                           style={{ backgroundColor: cfg.bg, color: cfg.color }}
                         >
-                          {cfg.icon} {cfg.label}
+                          {cfg.label}
                         </span>
                       </div>
                       <TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '11px' }} />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { X, AlertTriangle, Ghost, Trash2, UserCheck, Cloud, Shield, Sword, Handshake, FolderLock } from 'lucide-react'
+import { X, AlertTriangle, Ghost, Trash2, UserCheck, Cloud, Shield, Sword, Handshake, FolderLock, BadgeDollarSign, TrendingUp, Users } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
+import { generateDecoyHotSearch } from '@/engine/gemini'
 import type { LucideIcon } from 'lucide-react'
 
 interface Strategy {
@@ -51,6 +52,33 @@ const strategies: Strategy[] = [
     consequence: '暂时转移注意力，但如果被识破，信任度-15，舆论热度+10。风险很高。',
   },
   {
+    id: 'buy_paparazzi',
+    name: '买通狗仔/D社',
+    icon: BadgeDollarSign,
+    description: '花钱压下一组模糊图，让爆料号暂缓发布',
+    riskLevel: 4,
+    benefitLevel: 4,
+    consequence: '狗仔热度下降，但金钱-25，内部泄露风险上升。对方可能以后继续加价。',
+  },
+  {
+    id: 'buy_hotsearch',
+    name: '买别人热搜',
+    icon: TrendingUp,
+    description: '制造别人的绯闻/新瓜，把搜索词和论坛注意力带走',
+    riskLevel: 4,
+    benefitLevel: 3,
+    consequence: '短期混淆视听，Naver 会出现替代热搜；若被发现是买榜，公众热度会反噬。',
+  },
+  {
+    id: 'teammate_fanservice',
+    name: '队友营业挡枪',
+    icon: Users,
+    description: '让他和队友发互动、舞台reaction或双人直播片段，把CP热度顶上来',
+    riskLevel: 2,
+    benefitLevel: 4,
+    consequence: '恋爱讨论会被队友互动稀释，但他事业压力上升，部分队友粉可能不满。',
+  },
+  {
     id: 'control_narrative',
     name: '控评',
     icon: Shield,
@@ -98,6 +126,7 @@ export default function CrisisPanel({ onClose }: CrisisPanelProps) {
   const state = useGameStore()
   const performAction = useGameStore((s) => s.performAction)
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null)
+  const [isExecuting, setIsExecuting] = useState(false)
 
   const crisisLevel = Math.min(5, Math.max(1, Math.floor(state.risk.publicHeat / 20)))
 
@@ -107,6 +136,32 @@ export default function CrisisPanel({ onClose }: CrisisPanelProps) {
     3: 'D社收到了匿名爆料，正在调查',
     4: '你的照片和信息已经在粉圈流传',
     5: '恋情即将曝光！D社已经掌握了关键证据',
+  }
+
+  const handleExecuteStrategy = async () => {
+    if (!selectedStrategy || isExecuting) return
+    setIsExecuting(true)
+    let payload: any = undefined
+
+    if (selectedStrategy.id === 'buy_hotsearch') {
+      try {
+        payload = {
+          decoy: await generateDecoyHotSearch({
+            stageName: state.maleLead.stageName,
+            publicHeat: state.risk.publicHeat,
+            fanSuspicion: state.risk.fanSuspicion,
+            currentRumor: crisisDescriptions[crisisLevel],
+          }),
+        }
+      } catch {
+        payload = undefined
+      }
+    }
+
+    performAction(`crisis_${selectedStrategy.id}`, payload)
+    setSelectedStrategy(null)
+    setIsExecuting(false)
+    onClose()
   }
 
   return (
@@ -235,11 +290,8 @@ export default function CrisisPanel({ onClose }: CrisisPanelProps) {
                   再想想
                 </button>
                 <button
-                  onClick={() => {
-                    performAction(`crisis_${selectedStrategy.id}`)
-                    setSelectedStrategy(null)
-                    onClose()
-                  }}
+                  onClick={handleExecuteStrategy}
+                  disabled={isExecuting}
                   className="flex-1 px-4 py-2 rounded-xl text-xs font-bold"
                   style={{
                     background: 'linear-gradient(135deg, #ef4444, #dc2626)',
@@ -247,7 +299,7 @@ export default function CrisisPanel({ onClose }: CrisisPanelProps) {
                     boxShadow: '0 0 15px rgba(239,68,68,0.3)',
                   }}
                 >
-                  执行策略
+                  {isExecuting ? '执行中...' : '执行策略'}
                 </button>
               </div>
             </div>

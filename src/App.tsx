@@ -25,13 +25,15 @@ import Weverse from '@/components/Apps/Weverse'
 import Naver from '@/components/Apps/Naver'
 import CompanyNotice from '@/components/Apps/CompanyNotice'
 import Dispatch from '@/components/Apps/Dispatch'
+import Offline from '@/components/Apps/Offline'
 import Calendar from '@/components/Apps/Calendar'
 import Gallery from '@/components/Apps/Gallery'
 import Notes from '@/components/Apps/Notes'
 import Health from '@/components/Apps/Health'
 import StoryProgression from '@/components/Game/StoryProgression'
 import DailyIncidentModal from '@/components/Game/DailyIncidentModal'
-import { BarChart3, Zap, FastForward, FolderOpen, Settings, Bell, BookOpen, Heart, SkipForward, Key, AlertCircle } from 'lucide-react'
+import NarrativeMode from '@/components/Game/NarrativeMode'
+import { BarChart3, Zap, FastForward, FolderOpen, Settings, Bell, BookOpen, Heart, SkipForward, Key, ScrollText } from 'lucide-react'
 import { useSettingsStore } from '@/store/settingsStore'
 
 function AppContent() {
@@ -129,6 +131,7 @@ function GameScreen() {
   const [dateSystemOpen, setDateSystemOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [storyProgressionOpen, setStoryProgressionOpen] = useState(true)
+  const [narrativeModeOpen, setNarrativeModeOpen] = useState(false)
   const [relationshipGuideOpen, setRelationshipGuideOpen] = useState(false)
   const [daysSinceLastDate, setDaysSinceLastDate] = useState(0)
   const [dailyIncidentOpen, setDailyIncidentOpen] = useState(false)
@@ -166,6 +169,7 @@ function GameScreen() {
     setDateSystemOpen(false)
     setSettingsOpen(false)
     setStoryProgressionOpen(false)
+    setNarrativeModeOpen(false)
     setRelationshipGuideOpen(false)
   }
 
@@ -201,6 +205,7 @@ function GameScreen() {
       case 'naver': return <Naver />
       case 'companyNotice': return <CompanyNotice />
       case 'dispatch': return <Dispatch />
+      case 'offline': return <Offline />
       case 'calendar': return <Calendar />
       case 'gallery': return <Gallery />
       case 'notes': return <Notes />
@@ -323,6 +328,22 @@ function GameScreen() {
         </button>
 
         <button
+          onClick={() => {
+            closeAllPanels()
+            setNarrativeModeOpen(true)
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200"
+          style={{
+            background: narrativeModeOpen ? 'rgba(14,165,233,0.15)' : 'rgba(0,0,0,0.03)',
+            border: narrativeModeOpen ? '1px solid rgba(14,165,233,0.3)' : '1px solid rgba(0,0,0,0.06)',
+            color: narrativeModeOpen ? '#0ea5e9' : 'rgba(28,28,30,0.5)',
+          }}
+        >
+          <ScrollText size={14} />
+          文游
+        </button>
+
+        <button
           onClick={() => setShowWeekSummary(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200"
           style={{
@@ -377,7 +398,15 @@ function GameScreen() {
       <SaveLoadPanel isOpen={saveLoadOpen} onClose={() => setSaveLoadOpen(false)} />
       <DateSystem isOpen={dateSystemOpen} onClose={() => setDateSystemOpen(false)} />
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <StoryProgression isOpen={storyProgressionOpen} onClose={() => setStoryProgressionOpen(false)} />
+      <StoryProgression
+        isOpen={storyProgressionOpen}
+        onClose={() => setStoryProgressionOpen(false)}
+        onOpenNarrativeMode={() => {
+          setStoryProgressionOpen(false)
+          setNarrativeModeOpen(true)
+        }}
+      />
+      <NarrativeMode isOpen={narrativeModeOpen} onClose={() => setNarrativeModeOpen(false)} />
       <DailyIncidentModal
         isOpen={dailyIncidentOpen}
         onClose={() => setDailyIncidentOpen(false)}

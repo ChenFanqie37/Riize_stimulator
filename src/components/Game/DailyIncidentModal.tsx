@@ -59,6 +59,38 @@ const incidentTemplates = [
     forumTitle: '【考古】这条线其实早有预兆',
     forumContent: '从那次机场到最近的同款，所有时间点放一起就很微妙。先存档，别让人删了。',
   },
+  {
+    id: 'teammate_cover',
+    title: '队友突然帮他挡了一句',
+    description: '直播里有人刷到恋爱关键词，队友立刻把话题带到新专辑和舞台站位。他笑了一下，但那一秒的松气被粉丝剪出来反复看。',
+    caption: '有人替你把风吹到别处。',
+    forumTitle: '【队友】刚才是不是有人帮忙挡话题',
+    forumContent: '直播里那个转话题太明显了吧？也可能只是队友默契，但现在剪辑号都在发“救场瞬间”。',
+  },
+  {
+    id: 'album_diversion',
+    title: '新专辑讨论压过了恋爱词',
+    description: '主打曲预告突然释出，评论区一半在吵part分配，一半在夸概念图。恋爱猜测还在，但被音乐话题压到第二页。',
+    caption: '今天先把心跳藏进鼓点里。',
+    forumTitle: '【回归】先聊新专辑别聊乱七八糟的',
+    forumContent: '预告质感不错，桥段编排也有变化。恋爱瓜先放一边吧，回归期别让黑子拿热度。',
+  },
+  {
+    id: 'staff_hint',
+    title: '工作人员的提醒太具体',
+    description: '一个工作人员小号发了句“非公开路线别跟”，没点名，却刚好卡在你们昨晚见面之后。粉丝开始猜公司是不是已经知道更多。',
+    caption: '越具体的提醒，越像答案。',
+    forumTitle: '【工作人员】这句提醒是不是在说某条线',
+    forumContent: '非公开路线、不要跟车、不要发定位，这几个词放一起就很微妙。公司可能比粉丝更早知道。',
+  },
+  {
+    id: 'wrong_target',
+    title: '粉丝扒错了人',
+    description: '一个无关女生因为穿了相似外套被错认，评论区短暂失控。你松了一口气，但也看到这场游戏会伤到别人。',
+    caption: '有时候沉默也会落到别人身上。',
+    forumTitle: '【澄清】刚才那个女生不是她吧',
+    forumContent: '拜托别乱挂素人，外套像不等于本人。真正的问题是为什么大家已经急到开始找替身了。',
+  },
 ]
 
 function pickIncidentIndex(week: number, day: number) {

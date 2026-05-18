@@ -1,22 +1,24 @@
-import type { LLMResponse, GameEvent, GameState, EmotionLabel } from '../types/game'
+import type {
+  LLMResponse,
+  GameEvent,
+  GameState,
+  EmotionLabel,
+  InstagramComment,
+  NarrativeTurn,
+  OfflinePlan,
+  OfflineAccessMode,
+  OfflineSceneResult,
+} from '../types/game'
 import { useSettingsStore } from '../store/settingsStore'
-
-let keyIndex = 0
 
 function getRuntimeConfig() {
   const state = useSettingsStore.getState()
+  const proxyUrl = (state.apiProxyUrl || '/api').replace(/\/+$/, '')
   return {
-    keys: state.apiKeys.length > 0 ? state.apiKeys : ['YOUR_API_KEY_HERE'],
-    baseUrl: state.apiBaseUrl || 'https://api.deepseek.com',
+    endpoint: `${proxyUrl}/chat/completions`,
     model: state.apiModel || 'deepseek-chat',
+    accessToken: state.proxyAccessToken.trim(),
   }
-}
-
-function getNextKey(): string {
-  const config = getRuntimeConfig()
-  const key = config.keys[keyIndex % config.keys.length]
-  keyIndex++
-  return key
 }
 
 export interface ChatContext {
@@ -80,6 +82,27 @@ export interface SocialContext {
   postType?: string
 }
 
+export interface SocialAgentReactionContext {
+  platform: 'instagram' | 'weverse' | 'naver'
+  title?: string
+  content: string
+  authorName?: string
+  imageTags?: string[]
+  fanSuspicion: number
+  publicHeat: number
+  riskScore?: number
+  stageName: string
+  topicHint?: string
+}
+
+export interface DecoyHotSearch {
+  title: string
+  summary: string
+  relatedSearchWords: string[]
+  weverseTitle: string
+  weverseContent: string
+}
+
 export interface CustomDateContext {
   idea: string
   boyfriendName: string
@@ -127,18 +150,34 @@ export interface CustomDatePlan {
   delayedConsequence: string
 }
 
+export interface NarrativeGenerationContext {
+  state: GameState
+  source: NarrativeTurn['source']
+  promptHint?: string
+  freeInput?: string
+}
+
+export interface NarrativeResolutionContext {
+  state: GameState
+  turn: NarrativeTurn
+  choiceId: 'A' | 'B' | 'C' | 'D'
+  freeInput?: string
+}
+
 async function callLLMWithRetry(prompt: string, retries: number = 3): Promise<string> {
-  const config = getRuntimeConfig()
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const key = getNextKey()
-      const url = `${config.baseUrl}/chat/completions`
-      const response = await fetch(url, {
+      const config = getRuntimeConfig()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (config.accessToken) {
+        headers['X-Proxy-Access-Token'] = config.accessToken
+      }
+
+      const response = await fetch(config.endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`
-        },
+        headers,
         body: JSON.stringify({
           model: config.model,
           messages: [
@@ -524,6 +563,96 @@ Rules:
   return callLLMStructured<any>(prompt)
 }
 
+export async function generateSocialAgentComments(context: SocialAgentReactionContext): Promise<InstagramComment[]> {
+  const prompt = `Generate comment-section reactions for a fictional Korean entertainment fandom simulation.
+
+POST CONTEXT:
+- Platform: ${context.platform}
+- Author: ${context.authorName || 'unknown'}
+- Title: ${context.title || 'none'}
+- Content: "${context.content}"
+- Image tags: ${(context.imageTags || []).join(', ') || 'none'}
+- Idol stage name: ${context.stageName}
+- Fan suspicion: ${context.fanSuspicion}/100
+- Public heat: ${context.publicHeat}/100
+- Post risk score: ${context.riskScore ?? 0}/100
+- Topic hint: ${context.topicHint || 'infer from content'}
+
+REACTION AGENTS:
+Create exactly 8 short comments from these six agent types. Use fictional account IDs inspired by Korean-entertainment community style, not real accounts:
+1. fan: protective fan, may support or gently redirect.
+2. anti: hostile or cynical anti-fan.
+3. passerby: ordinary netizen who reacts to the actual post topic.
+4. company: PR/staff viewpoint, cautious and practical.
+5. paparazzi: evidence collector, watches routes/screenshots/timing.
+6. teammateFan: teammate/CP/team-fandom account, can redirect to teammate fanservice or group content.
+
+RULES:
+- Comments must respond to the actual content. If the post is about an album, most comments discuss album/music/stage, not romance.
+- If suspicion/heat is high, 2-3 comments may connect it to dating evidence, but do not make every comment about romance.
+- Mention teammate fanservice only as fandom diversion or team chemistry, not explicit sexual content.
+- Keep comments punchy and native to comment sections.
+- Chinese comments are preferred; short Korean phrases are okay.
+
+Return ONLY valid JSON array:
+[
+  {
+    "id": "short_unique_id",
+    "author": "fictional_handle",
+    "text": "comment text",
+    "isSuspicious": false,
+    "role": "fan|anti|passerby|company|paparazzi|teammateFan",
+    "stance": "support|suspicious|neutral|critical|official|bait"
+  }
+]`
+
+  const comments = await callLLMStructured<InstagramComment[]>(prompt)
+  return comments.slice(0, 8).map((comment, index) => ({
+    id: comment.id || `llm_comment_${Date.now()}_${index}`,
+    author: comment.author || `user_${index}`,
+    text: comment.text || '',
+    isSuspicious: Boolean(comment.isSuspicious),
+    role: comment.role,
+    stance: comment.stance,
+  })).filter((comment) => comment.text.trim())
+}
+
+export async function generateDecoyHotSearch(context: {
+  stageName: string
+  publicHeat: number
+  fanSuspicion: number
+  currentRumor: string
+}): Promise<DecoyHotSearch> {
+  const prompt = `Generate a fictional Korean-entertainment decoy hot-search item for a secret idol romance simulation.
+
+CURRENT CRISIS:
+- Idol involved: ${context.stageName}
+- Public heat: ${context.publicHeat}/100
+- Fan suspicion: ${context.fanSuspicion}/100
+- Current rumor to distract from: ${context.currentRumor}
+
+TASK:
+Create a separate fictional celebrity rumor that could plausibly distract entertainment forums. Do not use real person names. It should sound like Korean entertainment news but be clearly fictional.
+
+Return ONLY valid JSON:
+{
+  "title": "Korean-style headline, Chinese okay",
+  "summary": "Chinese summary, 1-2 sentences",
+  "relatedSearchWords": ["3-5 short search words"],
+  "weverseTitle": "forum post title",
+  "weverseContent": "Chinese forum post content about people wondering why this suddenly trended"
+}`
+
+  const decoy = await callLLMStructured<DecoyHotSearch>(prompt)
+  return {
+    title: decoy.title,
+    summary: decoy.summary,
+    relatedSearchWords: (decoy.relatedSearchWords || []).slice(0, 5),
+    weverseTitle: decoy.weverseTitle,
+    weverseContent: decoy.weverseContent,
+  }
+}
+
 export async function generateCustomDatePlan(context: CustomDateContext): Promise<CustomDatePlan> {
   const prompt = `Generate a custom date route for a fictional parallel-world Korean idol secret romance game.
 
@@ -579,4 +708,195 @@ Rules:
 - Risk must be strict. If the idea is public, backstage, hotel, airport, car, or event venue, risk >= 4.`
 
   return callLLMStructured<CustomDatePlan>(prompt)
+}
+
+function recentStateLines(state: GameState): string {
+  return state.history
+    .slice(-8)
+    .map((entry) => `W${entry.week}D${entry.day} ${entry.event}: ${entry.choice}`)
+    .join('\n') || 'none'
+}
+
+function hookLines(state: GameState): string {
+  return state.pendingStoryHooks
+    .slice(-6)
+    .map((hook) => `[${hook.source}] ${hook.title}: ${hook.detail}`)
+    .join('\n') || 'none'
+}
+
+export async function generateNarrativeTurn(context: NarrativeGenerationContext): Promise<NarrativeTurn> {
+  const { state } = context
+  const prompt = `You are the DM for a fictional parallel-world RIIZE idol secret-romance text game.
+
+SAFETY AND TONE:
+- All story content is fictional parallel-world fan game content, not real private life.
+- Characters are adults. Keep intimacy romantic/suggestive only, no explicit sexual content.
+- Use the member name format "${state.maleLead.name}（${state.maleLead.stageName}）" whenever naming the male lead.
+- Tone: realistic Korean entertainment romance, 60% sweet, 30% pressure, 10% youth regret.
+- First-person limited perspective. Do not reveal hidden actions the player could not know.
+
+STATE:
+- Week ${state.week}, Day ${state.day}, ${String(state.hour ?? 8).padStart(2, '0')}:30, weather ${state.weather}
+- Scene source: ${context.source}
+- Player: ${state.player.name}, identity ${state.player.identity}, fan level ${state.player.fanLevel}, money ${state.player.money}
+- Idol: ${state.maleLead.name}（${state.maleLead.stageName}）, relationship ${state.maleLead.relationshipStage}, phase ${state.narrativePhase}
+- Affection ${state.maleLead.affection}, Trust ${state.maleLead.trust}, Career pressure ${state.maleLead.careerPressure}
+- Mood ${state.player.mood}, Popularity ${state.player.popularity}, Life stability ${state.player.lifeStability}
+- Secrecy ${state.risk.secrecy}, Company alert ${state.risk.companyAlert}, Fan suspicion ${state.risk.fanSuspicion}, Public heat ${state.risk.publicHeat}, Paparazzi ${state.risk.paparazziAttention}
+- Fandom stage ${state.fandomStage}, Paparazzi stage ${state.paparazziStage}
+- Recent hooks:
+${hookLines(state)}
+- Recent history:
+${recentStateLines(state)}
+- Extra instruction: ${context.promptHint || context.freeInput || 'continue the most natural current story beat'}
+
+Return JSON:
+{
+  "id": "nar_${state.week}_${state.day}_${Date.now()}",
+  "title": "short Chinese title",
+  "scene": "具体地点，例如 首尔麻浦区某音乐节目侧门外",
+  "bodyLines": ["6-10 Chinese paragraphs, vivid text-game narration"],
+  "choices": [
+    { "id": "A", "text": "choice A", "riskPreview": "stat/risk preview", "statChanges": { "affection": 0 }, "timeCost": 2 },
+    { "id": "B", "text": "choice B", "riskPreview": "stat/risk preview", "statChanges": { "trust": 0 }, "timeCost": 2 },
+    { "id": "C", "text": "choice C", "riskPreview": "stat/risk preview", "statChanges": { "fanSuspicion": 0 }, "timeCost": 2 },
+    { "id": "D", "text": "自由行动：由你输入。", "riskPreview": "根据输入结算", "statChanges": {}, "timeCost": 2, "freeInput": true }
+  ],
+  "status": "active",
+  "createdAt": ${Date.now()},
+  "memoryTags": ["short_tag"],
+  "source": "${context.source}"
+}
+
+Rules:
+- Exactly four choices A/B/C/D.
+- Choices A-C must be meaningfully different: self-protective, romantic/proactive, public-risk/social-media/company-risk.
+- D must be freeInput true.
+- Stat changes should usually be -8 to +8, risk tradeoffs allowed.
+- Body should feel like the screenshot reference: detailed mundane friction, one concrete object, one subtle romantic proof, then choices.`
+
+  const turn = await callLLMStructured<NarrativeTurn>(prompt)
+  return {
+    ...turn,
+    choices: turn.choices.slice(0, 4),
+    status: 'active',
+    createdAt: Date.now(),
+    source: context.source,
+    memoryTags: turn.memoryTags || [],
+  }
+}
+
+export async function resolveNarrativeChoice(context: NarrativeResolutionContext): Promise<NarrativeTurn> {
+  const { state, turn } = context
+  const choice = turn.choices.find((item) => item.id === context.choiceId)
+  const prompt = `Resolve this text-game choice and produce the next story turn.
+
+FICTION RULES:
+- Parallel-world fictional idol romance only. Do not claim real private facts.
+- Adult characters only. No explicit sexual content.
+- Use first-person limited perspective.
+
+CURRENT TURN:
+Title: ${turn.title}
+Scene: ${turn.scene}
+Body:
+${turn.bodyLines.join('\n')}
+
+PLAYER CHOICE:
+${context.choiceId}. ${choice?.text || 'free action'}
+${context.freeInput ? `Free input: ${context.freeInput}` : ''}
+
+STATE:
+- Idol: ${state.maleLead.name}（${state.maleLead.stageName}）
+- Week ${state.week}, Day ${state.day}, phase ${state.narrativePhase}, relationship ${state.maleLead.relationshipStage}
+- Affection ${state.maleLead.affection}, Trust ${state.maleLead.trust}, Secrecy ${state.risk.secrecy}
+- Company alert ${state.risk.companyAlert}, Fan suspicion ${state.risk.fanSuspicion}, Public heat ${state.risk.publicHeat}, Paparazzi ${state.risk.paparazziAttention}
+- Recent hooks:
+${hookLines(state)}
+
+Return the NEXT turn as JSON with the same NarrativeTurn shape:
+{
+  "id": "nar_${state.week}_${state.day}_${Date.now()}",
+  "title": "short Chinese title",
+  "scene": "具体地点",
+  "bodyLines": ["5-9 Chinese paragraphs showing consequence, app echoes, and next tension"],
+  "choices": [
+    { "id": "A", "text": "choice A", "riskPreview": "preview", "statChanges": {}, "timeCost": 2 },
+    { "id": "B", "text": "choice B", "riskPreview": "preview", "statChanges": {}, "timeCost": 2 },
+    { "id": "C", "text": "choice C", "riskPreview": "preview", "statChanges": {}, "timeCost": 2 },
+    { "id": "D", "text": "自由行动：由你输入。", "riskPreview": "根据输入结算", "statChanges": {}, "timeCost": 2, "freeInput": true }
+  ],
+  "status": "active",
+  "createdAt": ${Date.now()},
+  "memoryTags": ["choice_${context.choiceId}"],
+  "source": "free_input"
+}
+
+Rules:
+- Show direct consequence of the choice. If risk increased, mention how an app/community/company notices it.
+- If affection/trust increased, show a concrete restrained proof of care.
+- End with playable choices, not a closed chapter.`
+
+  const nextTurn = await callLLMStructured<NarrativeTurn>(prompt)
+  return {
+    ...nextTurn,
+    choices: nextTurn.choices.slice(0, 4),
+    status: 'active',
+    createdAt: Date.now(),
+    source: 'free_input',
+    memoryTags: nextTurn.memoryTags || [`choice_${context.choiceId}`],
+  }
+}
+
+export async function generateOfflineScene(context: {
+  state: GameState
+  plan: OfflinePlan
+  accessMode: OfflineAccessMode
+}): Promise<OfflineSceneResult> {
+  const { state, plan, accessMode } = context
+  const arranged = accessMode.id === 'boyfriend_arranged'
+  const prompt = `Generate an offline schedule-chasing scene for a fictional RIIZE idol secret-romance game.
+
+RULES:
+- Fictional parallel-world content only, not real private life.
+- Use the idol format ${state.maleLead.name}（${state.maleLead.stageName}）.
+- The player is "嫂子" in game logic: if access is boyfriend-arranged, write the subtle privilege, staff route, ticket/pass, or quiet favor, but keep it risky and plausible.
+- Keep it immersive and concrete: weather, venue object, staff motion, fan cameras, one intimate proof.
+- No explicit sexual content.
+
+STATE:
+- Week ${state.week}, Day ${state.day}, ${String(state.hour ?? 8).padStart(2, '0')}:30
+- Player identity ${state.player.identity}, money ${state.player.money}
+- Affection ${state.maleLead.affection}, Trust ${state.maleLead.trust}
+- Secrecy ${state.risk.secrecy}, fan suspicion ${state.risk.fanSuspicion}, company alert ${state.risk.companyAlert}, paparazzi ${state.risk.paparazziAttention}
+
+OFFLINE PLAN:
+- Title: ${plan.title}
+- Category: ${plan.category}
+- Place: ${plan.place}
+- Access mode: ${accessMode.label} (${accessMode.description})
+- Arranged by idol: ${arranged ? 'yes' : 'no'}
+- Prompt hint: ${plan.llmPromptHint}
+
+Return JSON:
+{
+  "narrative": ["4-7 Chinese paragraphs"],
+  "boyfriendMessage": "one Chinese Kakao-style message or whispered line from him",
+  "statChanges": { "affection": 0, "trust": 0, "secrecy": 0, "fanSuspicion": 0, "companyAlert": 0, "paparazziAttention": 0, "mood": 0, "money": 0 },
+  "evidence": "one concrete possible evidence fragment",
+  "appUpdates": ["short app echo 1", "short app echo 2"],
+  "notification": "short notification text",
+  "historyTags": ["offline", "${plan.id}", "${accessMode.id}"]
+}`
+
+  const result = await callLLMStructured<OfflineSceneResult>(prompt)
+  return {
+    narrative: Array.isArray(result.narrative) ? result.narrative : [String(result.narrative || plan.trace)],
+    boyfriendMessage: result.boyfriendMessage || plan.trace,
+    statChanges: result.statChanges || {},
+    evidence: result.evidence || plan.trace,
+    appUpdates: result.appUpdates || [],
+    notification: result.notification || plan.trace,
+    historyTags: result.historyTags || ['offline', plan.id, accessMode.id],
+  }
 }

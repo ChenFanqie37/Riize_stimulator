@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { X, MapPin, AlertTriangle, Image as ImageIcon } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { createClueFromPost, calculatePostRisk } from '@/engine/clueEngine'
+import { generateSocialAgentComments } from '@/engine/gemini'
+import { generateFallbackSocialComments, toInstagramComments } from '@/engine/socialAgents'
 import type { PostType, Visibility, InstagramPost } from '@/types/game'
 
 const categories = [
@@ -38,6 +40,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const updateStats = useGameStore((s) => s.updateStats)
   const addNotification = useGameStore((s) => s.addNotification)
   const player = useGameStore((s) => s.player)
+  const maleLead = useGameStore((s) => s.maleLead)
   const risk = useGameStore((s) => s.risk)
   const hiddenRisk = useGameStore((s) => s.hiddenRisk)
   const addClue = useGameStore((s) => s.addClue)
@@ -53,6 +56,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const [visibility, setVisibility] = useState<Visibility>(pendingDraft?.visibility || 'public')
   const [showLocation, setShowLocation] = useState(pendingDraft?.showLocation || false)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | undefined>(pendingDraft?.sourcePhotoId)
+  const [isPosting, setIsPosting] = useState(false)
 
   useEffect(() => {
     if (!pendingDraft) return
@@ -71,7 +75,9 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const riskMod = visibilityOption.riskMod
   const totalRisk = Math.max(0, Math.min(100, baseRisk + riskMod + (risk.fanSuspicion > 50 ? 10 : 0)))
 
-  const handlePost = () => {
+  const handlePost = async () => {
+    if (isPosting) return
+    setIsPosting(true)
     const selectedPhoto = galleryPhotos.find((photo) => photo.id === selectedPhotoId)
     const imageTags = selectedPhoto
       ? [selectedPhoto.source, selectedPhoto.riskLevel === 'high' ? 'couple' : 'mood']
@@ -85,6 +91,34 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
               ? ['night', 'selfie']
               : ['cafe', 'food']
     const { riskScore, hiddenRiskChanges } = calculatePostRisk(caption, imageTags, visibility, hiddenRisk)
+    let generatedComments = toInstagramComments(generateFallbackSocialComments({
+      platform: 'instagram',
+      content: caption,
+      authorName: player.name,
+      imageTags,
+      riskScore,
+      fanSuspicion: risk.fanSuspicion,
+      publicHeat: risk.publicHeat,
+      stageName: maleLead.stageName,
+    }))
+
+    try {
+      const llmComments = await generateSocialAgentComments({
+        platform: 'instagram',
+        content: caption,
+        authorName: player.name,
+        imageTags,
+        riskScore,
+        fanSuspicion: risk.fanSuspicion,
+        publicHeat: risk.publicHeat,
+        stageName: maleLead.stageName,
+        topicHint: selectedCategory.label,
+      })
+      if (llmComments.length > 0) generatedComments = llmComments
+    } catch {
+      // Fall back to local agents when the proxy/LLM is unavailable.
+    }
+
     const post: InstagramPost = {
       id: `ig_${Date.now()}`,
       author: 'player',
@@ -96,7 +130,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
       visibility,
       riskScore,
       likes: Math.floor(Math.random() * 50) + 5,
-      comments: [],
+      comments: generatedComments,
       views: Math.floor(Math.random() * 200) + 20,
       isDeleted: false,
       isScreenshotted: false,
@@ -153,6 +187,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
         },
       }))
     }
+    setIsPosting(false)
     onClose()
   }
 
@@ -333,13 +368,13 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
         </button>
         <button
           onClick={handlePost}
-          disabled={!caption.trim()}
+          disabled={!caption.trim() || isPosting}
           className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-40"
           style={{
             background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)',
           }}
         >
-          发布
+          {isPosting ? '生成评论中...' : '发布'}
         </button>
       </div>
     </div>

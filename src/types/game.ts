@@ -8,7 +8,7 @@ export type StoryPace = 'slow_burn' | 'standard' | 'high_pressure' | 'growth' | 
 export type PlotPreference = 'A' | 'B' | 'C' | 'D'
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night'
 export type NarrativePhase = '起' | '承' | '转' | '合'
-export type AppName = 'kakaoTalk' | 'instagram' | 'weverse' | 'naver' | 'companyNotice' | 'dispatch' | 'calendar' | 'gallery' | 'notes' | 'health'
+export type AppName = 'kakaoTalk' | 'instagram' | 'weverse' | 'naver' | 'companyNotice' | 'dispatch' | 'offline' | 'calendar' | 'gallery' | 'notes' | 'health'
 export type RelationshipStatus = 'normal' | 'cold_war' | 'cooling_off' | 'crisis'
 export type EmotionLabel = 'sweet' | 'cold' | 'anxious' | 'jealous' | 'guilty' | 'avoidant' | 'angry' | 'vulnerable' | 'neutral'
 export type PostType = 'story' | 'post' | 'reel'
@@ -144,6 +144,8 @@ export interface InstagramComment {
   author: string
   text: string
   isSuspicious: boolean
+  role?: 'fan' | 'anti' | 'passerby' | 'company' | 'paparazzi' | 'teammateFan'
+  stance?: 'support' | 'suspicious' | 'neutral' | 'critical' | 'official' | 'bait'
 }
 
 export interface InstagramDraft {
@@ -164,6 +166,7 @@ export interface WeversePost {
   content: string
   heat: number
   comments: number
+  commentList?: InstagramComment[]
   isPlayerAlt: boolean
   relatedEvidenceIds: string[]
   createdAt: number
@@ -176,6 +179,7 @@ export interface NaverNews {
   source: string
   heat: number
   relatedSearchWords: string[]
+  commentList?: InstagramComment[]
   createdAt: number
 }
 
@@ -392,10 +396,91 @@ export interface DelayedEcho {
   triggered?: boolean
 }
 
+export type NarrativeChoiceId = 'A' | 'B' | 'C' | 'D'
+export type NarrativeTurnStatus = 'active' | 'resolved'
+export type NarrativeTurnSource = 'opening' | 'story_panel' | 'narrative_mode' | 'offline' | 'daily' | 'free_input'
+
+export interface NarrativeChoice {
+  id: NarrativeChoiceId
+  text: string
+  riskPreview: string
+  statChanges: Record<string, number>
+  timeCost: number
+  freeInput?: boolean
+}
+
+export interface NarrativeTurn {
+  id: string
+  title: string
+  scene: string
+  bodyLines: string[]
+  choices: NarrativeChoice[]
+  status: NarrativeTurnStatus
+  createdAt: number
+  resolvedChoiceId?: NarrativeChoiceId
+  memoryTags: string[]
+  source: NarrativeTurnSource
+}
+
+export interface PendingStoryHook {
+  id: string
+  source: AppName | 'story' | 'system'
+  title: string
+  detail: string
+  weight: number
+  createdAt: number
+}
+
+export type OfflineCategory = 'concert' | 'fansign' | 'prerecording' | 'festival' | 'airport' | 'music_show' | 'company' | 'brand' | 'campus'
+export type OfflineAccessModeId = 'self_paid' | 'lottery' | 'outer_area' | 'work_pass' | 'boyfriend_arranged'
+
+export interface OfflineAccessMode {
+  id: OfflineAccessModeId
+  label: string
+  description: string
+  cost: number
+  riskDelta: number
+  rewardDelta: number
+  minAffection?: number
+  minTrust?: number
+  companyAlertDelta?: number
+}
+
+export interface OfflinePlan {
+  id: string
+  category: OfflineCategory
+  title: string
+  place: string
+  time: string
+  timeCost: number
+  baseCost: number
+  arrangedCost: number
+  minAffection: number
+  minTrust: number
+  risk: number
+  reward: number
+  detail: string
+  accessModes: OfflineAccessMode[]
+  effects: Record<string, number>
+  trace: string
+  llmPromptHint: string
+}
+
+export interface OfflineSceneResult {
+  narrative: string[]
+  boyfriendMessage: string
+  statChanges: Record<string, number>
+  evidence: string
+  appUpdates: string[]
+  notification: string
+  historyTags: string[]
+}
+
 export interface GameState {
   phase: 'cover' | 'creation' | 'playing' | 'ending'
   week: number
   day: number
+  hour: number
   timeOfDay: TimeOfDay
   weather: string
   player: Player
@@ -468,6 +553,9 @@ export interface GameState {
   fandomStage: FandomStage
   paparazziStage: PaparazziStage
   delayedEchoes: DelayedEcho[]
+  activeNarrativeTurn: NarrativeTurn | null
+  narrativeLog: NarrativeTurn[]
+  pendingStoryHooks: PendingStoryHook[]
 }
 
 export interface LLMResponse {

@@ -4,6 +4,7 @@ import { useGameStore } from '@/store/gameStore'
 import type { InstagramPost } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 import AppAccountBar from '../../Common/AppAccountBar'
+import { commentsForInstagramPost, type SocialAgentComment } from '@/engine/socialAgents'
 
 const tagGradients: Record<string, string> = {
   selfie: 'linear-gradient(135deg, #f093fb, #f5576c)',
@@ -29,43 +30,20 @@ const storyRingColors = [
   'conic-gradient(from 0deg, #f093fb, #f5576c, #feca57, #48dbfb, #ff9ff3, #f093fb)',
 ]
 
-function generatePostComments(post: InstagramPost, fanSuspicion: number): { author: string; text: string; stance: 'support' | 'suspicious' | 'neutral' | 'anti' }[] {
-  const comments: { author: string; text: string; stance: 'support' | 'suspicious' | 'neutral' | 'anti' }[] = []
-  const isBoyfriend = post.author === 'boyfriend'
-
-  if (isBoyfriend) {
-    comments.push({ author: 'riize_luv', text: '오빠 너무 잘생겼어요! 💕', stance: 'support' })
-    comments.push({ author: 'kpopfan_99', text: '이 사진 어디서 찍은 거야? 배경이...', stance: fanSuspicion > 40 ? 'suspicious' : 'neutral' })
-    comments.push({ author: 'protect_riize', text: '항상 응원합니다! 건강 챙기세요 🙏', stance: 'support' })
-    if (fanSuspicion > 30) {
-      comments.push({ author: 'detective_briize', text: '이 반지... 혹시 커플링?', stance: 'suspicious' })
-    }
-    if (fanSuspicion > 60) {
-      comments.push({ author: 'truth_revealer', text: '뒤에 여자 그림자 보이는데??', stance: 'anti' })
-    }
-    comments.push({ author: 'casual_viewer', text: '노래 좋아요~', stance: 'neutral' })
-  } else {
-    comments.push({ author: 'friend_1', text: '예쁘다! 😍', stance: 'support' })
-    comments.push({ author: 'random_22', text: '어디야? 가보고 싶다', stance: 'neutral' })
-    comments.push({ author: 'sasaeng_alert', text: '이 위치 팬들 사이에서 화제임', stance: 'suspicious' })
-  }
-
-  return comments.slice(0, 6)
-}
-
-const stanceConfig: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  support: { label: '支持', color: '#EC4899', bg: '#FDF2F8', icon: '💕' },
-  suspicious: { label: '怀疑', color: '#D97706', bg: '#FFFBEB', icon: '⚠️' },
-  neutral: { label: '路人', color: '#6B7280', bg: '#F9FAFB', icon: '💬' },
-  anti: { label: '黑粉', color: '#DC2626', bg: '#FEF2F2', icon: '🚫' },
+const roleConfig: Record<SocialAgentComment['role'], { label: string; color: string; bg: string }> = {
+  fan: { label: '粉丝', color: '#EC4899', bg: '#FDF2F8' },
+  anti: { label: '黑粉', color: '#DC2626', bg: '#FEF2F2' },
+  passerby: { label: '路人', color: '#6B7280', bg: '#F9FAFB' },
+  company: { label: '公司', color: '#2563EB', bg: '#EFF6FF' },
+  paparazzi: { label: '狗仔', color: '#D97706', bg: '#FFFBEB' },
+  teammateFan: { label: '队友粉', color: '#8B5CF6', bg: '#F5F3FF' },
 }
 
 export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId: string) => void; onNewPost: () => void }) {
   const posts = useGameStore((s) => s.instagram.posts)
   const stories = useGameStore((s) => s.instagram.stories)
   const player = useGameStore((s) => s.player)
-  const maleLead = useGameStore((s) => s.maleLead)
-  const fanSuspicion = useGameStore((s) => s.risk.fanSuspicion)
+  const state = useGameStore()
   const [refreshing, setRefreshing] = useState(false)
   const [selectedPost, setSelectedPost] = useState<InstagramPost | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
@@ -78,7 +56,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
   }
 
   if (selectedPost) {
-    const comments = generatePostComments(selectedPost, fanSuspicion)
+    const comments = commentsForInstagramPost(selectedPost, state)
     return (
       <div className="flex flex-col h-full bg-white">
         <div
@@ -142,7 +120,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
             <p className="text-xs font-semibold text-gray-700 mb-2">评论</p>
             <div className="flex flex-col gap-2">
               {comments.map((c, i) => {
-                const cfg = stanceConfig[c.stance]
+                const cfg = roleConfig[c.role]
                 return (
                   <div key={i} className="flex items-start gap-2">
                     <div
@@ -158,7 +136,7 @@ export default function Feed({ onViewStory, onNewPost }: { onViewStory: (storyId
                           className="text-[9px] px-1 py-0.5 rounded font-medium"
                           style={{ backgroundColor: cfg.bg, color: cfg.color }}
                         >
-                          {cfg.icon} {cfg.label}
+                          {cfg.label}
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-600"><TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '12px' }} /></p>

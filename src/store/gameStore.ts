@@ -25,7 +25,10 @@ import type {
   PaparazziStage,
   DelayedEcho,
   GameEvent,
-  AppAccount
+  AppAccount,
+  NarrativeTurn,
+  NarrativeChoiceId,
+  PendingStoryHook
 } from '../types/game'
 import { riizeMembers, npcTemplates, createNPCFromTemplate, getRandomPersona, getMemberData } from '../data/characters'
 import { eventChains } from '../data/events'
@@ -45,7 +48,7 @@ import {
 import { evaluateFandomCycle, evaluatePaparazziProgress, getCompanyReaction } from '../engine/clueEngine'
 
 const dayWeathers = ['晴', '多云', '阴', '小雨', '大雨', '雾', '大风']
-const accountApps: AppName[] = ['kakaoTalk', 'instagram', 'weverse', 'naver', 'companyNotice', 'dispatch', 'calendar', 'gallery', 'notes', 'health']
+const accountApps: AppName[] = ['kakaoTalk', 'instagram', 'weverse', 'naver', 'companyNotice', 'dispatch', 'offline', 'calendar', 'gallery', 'notes', 'health']
 
 function buildAppAccounts(playerName = '你', identity: PlayerIdentity = 'student'): Record<AppName, AppAccount> {
   const safeName = playerName || '你'
@@ -128,6 +131,17 @@ function buildAppAccounts(playerName = '你', identity: PlayerIdentity = 'studen
       riskNote: '你看得越多，越知道狗仔在拼哪块图。',
       isAnonymous: true,
     },
+    offline: {
+      app: 'offline',
+      displayName: `${safeName}的线下号`,
+      handle: `@offline_${slug.slice(0, 6)}`,
+      avatar: '线',
+      persona: '追线下/行程观察',
+      accountType: 'alt',
+      followers: identity === 'fan' ? 320 : 38,
+      riskNote: '越靠近非公开路线，越容易被站姐、私生或公司记住脸。',
+      isAnonymous: true,
+    },
     calendar: {
       app: 'calendar',
       displayName: `${safeName}的日程`,
@@ -183,8 +197,30 @@ function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value))
 }
 
+function balancedSecrecyDelta(current: number, value: number): number {
+  if (value >= 0) return value
+  const ratio = current < 35 ? 0.45 : 0.65
+  return Math.max(-8, Math.ceil(value * ratio))
+}
+
 function currentRound(state: GameState): number {
   return (state.week - 1) * 7 + state.day
+}
+
+function timeOfDayFromHour(hour: number): GameState['timeOfDay'] {
+  if (hour < 12) return 'morning'
+  if (hour < 18) return 'afternoon'
+  if (hour < 22) return 'evening'
+  return 'night'
+}
+
+function actionTimeCost(actionId: string): number {
+  if (actionId.includes('call')) return 2
+  if (actionId.includes('search') || actionId.includes('delete')) return 1
+  if (actionId.includes('crisis')) return 4
+  if (actionId.includes('offline')) return 6
+  if (actionId.includes('meet')) return 6
+  return 3
 }
 
 const socialAngles = {
@@ -235,7 +271,11 @@ function applyDailyStatChanges(state: GameState, changes: Record<string, number>
     else if (key === 'money') next = { ...next, player: { ...next.player, money: Math.max(0, next.player.money + value) } }
     else if (key === 'lifeStability') next = { ...next, player: { ...next.player, lifeStability: clamp(next.player.lifeStability + value) } }
     else if (key === 'popularity') next = { ...next, player: { ...next.player, popularity: clamp(next.player.popularity + value) } }
-    else if (key in next.risk) next = { ...next, risk: { ...next.risk, [key]: key === 'evidenceCount' ? Math.max(0, next.risk.evidenceCount + value) : clamp((next.risk[key as keyof GameState['risk']] as number) + value) } }
+    else if (key in next.risk) {
+      const riskKey = key as keyof GameState['risk']
+      const delta = riskKey === 'secrecy' ? balancedSecrecyDelta(next.risk.secrecy, value) : value
+      next = { ...next, risk: { ...next.risk, [key]: riskKey === 'evidenceCount' ? Math.max(0, next.risk.evidenceCount + value) : clamp((next.risk[riskKey] as number) + delta) } }
+    }
     else if (key === 'stress' || key === 'anxiety') next = { ...next, health: { ...next.health, stress: clamp(next.health.stress + value) } }
     else if (key === 'mentalHealth') next = { ...next, health: { ...next.health, mentalHealth: clamp(next.health.mentalHealth + value) } }
     else if (key === 'sleep') next = { ...next, health: { ...next.health, sleep: clamp(next.health.sleep + value) } }
@@ -904,6 +944,7 @@ const initialState: GameState = {
   phase: 'cover',
   week: 1,
   day: 1,
+  hour: 8,
   timeOfDay: 'morning',
   weather: '晴',
   player: {
@@ -1021,6 +1062,9 @@ const initialState: GameState = {
   fandomStage: 'none' as FandomStage,
   paparazziStage: 'observing' as PaparazziStage,
   delayedEchoes: [],
+  activeNarrativeTurn: null,
+  narrativeLog: [],
+  pendingStoryHooks: [],
 }
 
 interface GameStore extends GameState {
@@ -1038,6 +1082,7 @@ interface GameStore extends GameState {
   }) => void
   advanceWeek: () => void
   advanceDay: () => void
+  advanceTime: (hours: number) => void
   sendMessage: (threadId: string, textKo: string, textZh: string) => void
   receiveMessage: (threadId: string, message: ChatMessage) => void
   postInstagram: (post: InstagramPost) => void
@@ -1077,6 +1122,10 @@ interface GameStore extends GameState {
   evaluatePaparazziStage: () => PaparazziStage
   addDelayedEcho: (echo: DelayedEcho) => void
   processDelayedEchoes: () => void
+  setActiveNarrativeTurn: (turn: NarrativeTurn | null) => void
+  commitNarrativeChoice: (turnId: string, choiceId: NarrativeChoiceId, nextTurn: NarrativeTurn, freeInput?: string) => void
+  addPendingStoryHook: (hook: Omit<PendingStoryHook, 'id' | 'createdAt'>) => void
+  clearPendingStoryHooks: () => void
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -1177,6 +1226,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: 'playing',
       week: 1,
       day: 1,
+      hour: 8,
       timeOfDay: 'morning',
       weather: '晴',
       player: {
@@ -1259,6 +1309,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       fandomStage: 'none' as FandomStage,
       paparazziStage: 'observing' as PaparazziStage,
       delayedEchoes: [],
+      activeNarrativeTurn: null,
+      narrativeLog: [],
+      pendingStoryHooks: storyOpening
+        ? [{
+            id: uid('hook_opening'),
+            source: 'story',
+            title: storyOpening.title,
+            detail: `${storyOpening.coreTension} ${storyOpening.openingNarrative.slice(-2).join('')}`,
+            weight: 5,
+            createdAt: Date.now(),
+          }]
+        : [],
     })
   },
 
@@ -1268,7 +1330,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const newWeek = state.week + 1
     const newPhase = determineNarrativePhase(newWeek)
     const newRelationshipStage = determineRelationshipStage(state.maleLead.affection)
-    const weekBase = { ...state, ...weekEndUpdates, week: newWeek, day: 1, timeOfDay: 'morning' as const }
+    const weekBase = { ...state, ...weekEndUpdates, week: newWeek, day: 1, hour: 8, timeOfDay: 'morning' as const }
     const weekStartUpdates = processWeekStart(weekBase)
     const mergedState: GameState = {
       ...weekBase,
@@ -1299,6 +1361,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       calendar: weekStartUpdates.calendar || weekBase.calendar,
       week: newWeek,
       day: 1,
+      hour: 8,
       timeOfDay: 'morning',
       narrativePhase: newPhase,
       currentChapter: Math.floor(newWeek / 4) + 1
@@ -1342,6 +1405,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextDayState: GameState = {
       ...state,
       day: newDay,
+      hour: 8,
       timeOfDay: 'morning',
       player: {
         ...state.player,
@@ -1361,6 +1425,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...nextState.weverse,
         timeline: fanTimeline ? [...nextState.weverse.timeline, fanTimeline] : nextState.weverse.timeline
       }
+    })
+  },
+
+  advanceTime: (hours) => {
+    const state = get()
+    const safeHours = Math.max(0, Math.floor(hours || 0))
+    if (safeHours === 0) return
+
+    const totalHour = (state.hour ?? 8) + safeHours
+    const dayJumps = Math.floor(totalHour / 24)
+    const nextHour = totalHour % 24
+
+    for (let i = 0; i < dayJumps; i += 1) {
+      get().advanceDay()
+    }
+
+    set({
+      hour: nextHour,
+      timeOfDay: timeOfDayFromHour(nextHour),
     })
   },
 
@@ -1385,7 +1468,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ? { ...t, messages: [...t.messages, message] }
             : t
         )
-      }
+      },
+      pendingStoryHooks: [
+        ...state.pendingStoryHooks,
+        {
+          id: uid('hook_chat'),
+          source: 'kakaoTalk' as const,
+          title: threadId === 'thread_boyfriend' ? '你给他发了消息' : '你向闺蜜吐露近况',
+          detail: textZh || textKo,
+          weight: threadId === 'thread_boyfriend' ? 4 : 2,
+          createdAt: Date.now(),
+        },
+      ].slice(-12),
     })
   },
 
@@ -1414,7 +1508,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       instagram: {
         ...state.instagram,
         [targetList]: [...state.instagram[targetList], post]
-      }
+      },
+      pendingStoryHooks: [
+        ...state.pendingStoryHooks,
+        {
+          id: uid('hook_ig'),
+          source: 'instagram' as const,
+          title: `你发布了${post.contentType === 'story' ? 'Story' : '帖子'}`,
+          detail: `${post.text} ${post.imageTags.join('/')}`,
+          weight: post.riskScore > 50 ? 5 : 3,
+          createdAt: Date.now(),
+        },
+      ].slice(-12),
     })
   },
 
@@ -1500,7 +1605,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updated = { ...updated, player: { ...updated.player, mood: Math.max(0, Math.min(100, updated.player.mood + changes.mood)) } }
     }
     if (changes.secrecy !== undefined) {
-      updated = { ...updated, risk: { ...updated.risk, secrecy: Math.max(0, Math.min(100, updated.risk.secrecy + changes.secrecy)) } }
+      const delta = balancedSecrecyDelta(updated.risk.secrecy, changes.secrecy)
+      updated = { ...updated, risk: { ...updated.risk, secrecy: Math.max(0, Math.min(100, updated.risk.secrecy + delta)) } }
     }
     if (changes.companyAlert !== undefined) {
       updated = { ...updated, risk: { ...updated.risk, companyAlert: Math.max(0, Math.min(100, updated.risk.companyAlert + changes.companyAlert)) } }
@@ -1528,6 +1634,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     if (changes.money !== undefined) {
       updated = { ...updated, player: { ...updated.player, money: Math.max(0, updated.player.money + changes.money) } }
+    }
+    if (changes.actionPoints !== undefined) {
+      updated = { ...updated, player: { ...updated.player, actionPoints: Math.max(0, updated.player.actionPoints + changes.actionPoints) } }
     }
     if (changes.stress !== undefined || changes.anxiety !== undefined) {
       const delta = (changes.stress || 0) + (changes.anxiety || 0)
@@ -1706,6 +1815,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           : initialState.kakaoTalk
         set({
           ...parsed,
+          hour: typeof parsed.hour === 'number' ? parsed.hour : 8,
+          timeOfDay: parsed.timeOfDay || timeOfDayFromHour(typeof parsed.hour === 'number' ? parsed.hour : 8),
           player: parsed.player ? { ...parsed.player, bestieName: normalizedBestieName } : initialState.player,
           kakaoTalk: normalizedKakaoTalk,
           hiddenRisk: parsed.hiddenRisk || initialState.hiddenRisk,
@@ -1715,6 +1826,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           paparazziStage: parsed.paparazziStage || 'observing',
           delayedEchoes: parsed.delayedEchoes || [],
           appAccounts: parsed.appAccounts || buildAppAccounts(parsed.player?.name, parsed.player?.identity),
+          activeNarrativeTurn: parsed.activeNarrativeTurn || null,
+          narrativeLog: parsed.narrativeLog || [],
+          pendingStoryHooks: parsed.pendingStoryHooks || [],
           saves: currentSaves,
           isTyping: false,
           typingDuration: 0,
@@ -1748,7 +1862,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
   performAction: (actionId, payload) => {
     const state = get()
     const result = performPlayerAction(actionId, payload || {}, state)
-    set(result.state)
+    set({
+      ...result.state,
+      pendingStoryHooks: [
+        ...result.state.pendingStoryHooks,
+        {
+          id: uid('hook_action'),
+          source: 'story' as const,
+          title: '你执行了行动',
+          detail: result.feedback,
+          weight: actionId.includes('crisis') ? 5 : 3,
+          createdAt: Date.now(),
+        },
+      ].slice(-12),
+    })
+    get().advanceTime(payload?.timeCost ?? actionTimeCost(actionId))
     return result.feedback
   },
 
@@ -1982,4 +2110,80 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
     set({ delayedEchoes: updated })
   },
+
+  setActiveNarrativeTurn: (turn) => {
+    set({ activeNarrativeTurn: turn })
+  },
+
+  commitNarrativeChoice: (turnId, choiceId, nextTurn, freeInput) => {
+    const before = get()
+    const turn = before.activeNarrativeTurn?.id === turnId
+      ? before.activeNarrativeTurn
+      : before.narrativeLog.find((item) => item.id === turnId)
+    const choice = turn?.choices.find((item) => item.id === choiceId)
+    if (choice) {
+      get().updateStats(choice.statChanges)
+      get().advanceTime(choice.timeCost || 2)
+    }
+
+    const state = get()
+    const resolvedTurn: NarrativeTurn | null = turn
+      ? { ...turn, status: 'resolved', resolvedChoiceId: choiceId }
+      : null
+    const riskRaised = Boolean(choice && ((choice.statChanges.fanSuspicion || 0) > 0 || (choice.statChanges.publicHeat || 0) > 0 || (choice.statChanges.companyAlert || 0) > 0))
+    const relationshipRaised = Boolean(choice && ((choice.statChanges.affection || 0) > 0 || (choice.statChanges.trust || 0) > 0))
+    const historyChoice = choiceId === 'D' && freeInput ? freeInput : choice?.text || `选项 ${choiceId}`
+    const createdAt = Date.now()
+
+    set({
+      activeNarrativeTurn: nextTurn,
+      narrativeLog: [
+        ...state.narrativeLog,
+        ...(resolvedTurn ? [resolvedTurn] : []),
+        nextTurn,
+      ].slice(-40),
+      pendingStoryHooks: state.pendingStoryHooks.slice(-8),
+      notifications: [
+        ...state.notifications,
+        {
+          id: uid('notif_narrative'),
+          app: riskRaised ? 'weverse' : relationshipRaised ? 'kakaoTalk' : 'notes',
+          title: riskRaised ? '剧情后果开始发酵' : relationshipRaised ? '关系推进' : '剧情已推进',
+          content: nextTurn.bodyLines[0] || nextTurn.title,
+          urgency: riskRaised ? 'medium' : 'low',
+          isRead: false,
+          createdAt,
+        },
+      ],
+      history: [
+        ...state.history,
+        {
+          id: uid('hist_narrative'),
+          week: state.week,
+          day: state.day,
+          event: turn?.title || '剧情推进',
+          choice: historyChoice,
+          consequences: choice?.statChanges || {},
+          memoryTags: ['narrative_choice', `choice_${choiceId}`, ...nextTurn.memoryTags],
+          createdAt,
+        },
+      ],
+    })
+  },
+
+  addPendingStoryHook: (hook) => {
+    const state = get()
+    set({
+      pendingStoryHooks: [
+        ...state.pendingStoryHooks,
+        {
+          ...hook,
+          id: uid('hook'),
+          createdAt: Date.now(),
+        },
+      ].slice(-12),
+    })
+  },
+
+  clearPendingStoryHooks: () => set({ pendingStoryHooks: [] }),
 }))

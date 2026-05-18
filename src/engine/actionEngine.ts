@@ -17,11 +17,18 @@ import type {
   WeversePost,
 } from '../types/game'
 import { calculatePostRisk, createClueFromPost, evaluateFandomCycle, evaluatePaparazziProgress } from './clueEngine'
+import { generateFallbackSocialComments, toInstagramComments } from './socialAgents'
 
 const dayMs = 24 * 60 * 60 * 1000
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value))
+}
+
+function balancedSecrecyDelta(current: number, value: number): number {
+  if (value >= 0) return value
+  const ratio = current < 35 ? 0.45 : 0.65
+  return Math.max(-8, Math.ceil(value * ratio))
 }
 
 function rid(prefix: string): string {
@@ -207,7 +214,8 @@ export const playerActions: Record<string, PlayerAction> = {
 function applyStatChanges(state: GameState, changes: Record<string, number>): GameState {
   let s = { ...state }
   const updateRisk = (key: keyof GameState['risk'], value: number) => {
-    s = { ...s, risk: { ...s.risk, [key]: clamp((s.risk[key] as number) + value) } }
+    const delta = key === 'secrecy' ? balancedSecrecyDelta(s.risk.secrecy, value) : value
+    s = { ...s, risk: { ...s.risk, [key]: clamp((s.risk[key] as number) + delta) } }
   }
   const updatePlayer = (key: keyof GameState['player'], value: number, max = 100) => {
     const current = s.player[key]
@@ -359,6 +367,29 @@ function appendWeverse(state: GameState, post: Omit<WeversePost, 'id' | 'created
     weverse: {
       ...state.weverse,
       posts: [...state.weverse.posts, { ...post, id: rid('wv'), createdAt: Date.now() }],
+    },
+  }
+}
+
+function buildCommentList(state: GameState, platform: 'instagram' | 'weverse' | 'naver', content: string, title?: string, riskScore = 0) {
+  return toInstagramComments(generateFallbackSocialComments({
+    platform,
+    title,
+    content,
+    riskScore,
+    heat: state.risk.publicHeat,
+    fanSuspicion: state.risk.fanSuspicion,
+    publicHeat: state.risk.publicHeat,
+    stageName: state.maleLead.stageName,
+  }))
+}
+
+function appendInstagramPost(state: GameState, post: Omit<InstagramPost, 'id' | 'createdAt'>): GameState {
+  return {
+    ...state,
+    instagram: {
+      ...state.instagram,
+      posts: [...state.instagram.posts, { ...post, id: rid('ig'), createdAt: Date.now() }],
     },
   }
 }
@@ -975,7 +1006,7 @@ function performIdentityAbility(action: PlayerAction, state: GameState): { state
   return { state: refreshStages(s), feedback }
 }
 
-function performCrisisStrategy(actionId: string, state: GameState): { state: GameState; feedback: string } {
+function performCrisisStrategy(actionId: string, state: GameState, payload?: any): { state: GameState; feedback: string } {
   const strategy = actionId.replace('crisis_', '')
   let s = state
   let feedback = '危机策略已执行。'
@@ -989,6 +1020,33 @@ function performCrisisStrategy(actionId: string, state: GameState): { state: Gam
   } else if (strategy === 'boyfriend_explain') {
     s = applyStatChanges(s, { publicHeat: -8, fanSuspicion: -6, companyAlert: 12, careerPressure: 10 })
     s = boyfriendMessage(s, '내가 어떻게든 정리해볼게. 대신 너는 지금 아무 말도 하지 마.', '我会想办法处理。但你现在不要说任何话。', 'protective' as any, 'warning')
+    s = appendInstagramPost(s, {
+      author: 'boyfriend',
+      authorName: s.maleLead.stageName,
+      contentType: 'post',
+      text: '오늘도 무대 준비 중. 이상한 얘기보다 좋은 모습으로 답할게요.\n今天也在准备舞台。比起奇怪的话，我会用更好的样子回应。',
+      imageTags: ['studio', 'stage'],
+      visibility: 'public',
+      riskScore: 18,
+      likes: 12000 + s.player.popularity * 80,
+      comments: buildCommentList(s, 'instagram', '今天也在准备舞台。比起奇怪的话，我会用更好的样子回应。', undefined, 18),
+      views: 80000 + s.risk.publicHeat * 1200,
+      isDeleted: false,
+      isScreenshotted: false,
+      screenshottedBy: [],
+      boyfriendViewed: false,
+    })
+    s = appendWeverse(s, {
+      type: 'control',
+      author: 'official_mood_zip',
+      title: '방금 올린 글은 답변일까?',
+      content: `${s.maleLead.stageName}发了“用舞台回应”的帖子。粉丝一边说专注回归，一边讨论这是不是在否认恋爱传闻。`,
+      heat: clamp(45 + s.risk.publicHeat),
+      comments: 210,
+      commentList: buildCommentList(s, 'weverse', '艺人发了用舞台回应的帖子，评论区讨论这是澄清还是控评。', '방금 올린 글은 답변일까?', 18),
+      isPlayerAlt: false,
+      relatedEvidenceIds: [],
+    })
     feedback = '你让他解释，他接过了压力，公司警觉随之上升。'
   } else if (strategy === 'smoke_bomb') {
     s = applyStatChanges(s, { fanSuspicion: -7, publicHeat: -4, rumorCredibility: 8, trust: -3 })
@@ -1003,6 +1061,86 @@ function performCrisisStrategy(actionId: string, state: GameState): { state: Gam
       relatedEvidenceIds: [],
     })
     feedback = '烟雾弹成功搅乱时间线，但如果被识破会反噬。'
+  } else if (strategy === 'buy_paparazzi') {
+    s = applyStatChanges(s, { money: -25, paparazziAttention: -16, paparazziHeat: -18, publicHeat: -5, companyAlert: 6, insiderLeakRisk: 12, stress: 8 })
+    s = appendDispatch(s, {
+      type: 'dm_threat',
+      content: '爆料号私信回复：今晚的模糊图可以暂缓，但下一次如果拍到正脸，价格会翻倍。',
+      heatLevel: clamp(28 + s.hiddenRisk.paparazziHeat),
+    })
+    s = appendNote(s, {
+      title: 'D社封口记录',
+      content: '你花钱压下了一组停车场模糊图。它暂时救了你们，也让对方知道你会付钱。',
+      type: 'crisis',
+    })
+    s = schedule(s, 3, 'dispatch_blackmail', 'paid_paparazzi', '曾经被压下的狗仔线又回来了，对方开始索要更清晰的“封口费”。', { paparazziAttention: 10, paparazziHeat: 14, money: -10, stress: 8 })
+    feedback = '你买通了狗仔，图暂时没发，但这条线以后会变成勒索风险。'
+  } else if (strategy === 'buy_hotsearch') {
+    const decoys = [
+      { artist: '某人气男演员', clue: '深夜同车', words: ['男演员', '深夜同车', '否认恋情'] },
+      { artist: '某女团主唱', clue: '同款戒指', words: ['女团主唱', '同款戒指', '绯闻'] },
+      { artist: '新剧CP', clue: '片场互动过密', words: ['新剧CP', '片场互动', '热搜'] },
+      { artist: 'solo歌手', clue: '生日派对目击', words: ['solo歌手', '生日派对', '目击'] },
+    ]
+    const decoy = decoys[currentRound(s) % decoys.length]
+    s = applyStatChanges(s, { money: -18, publicHeat: -10, fanSuspicion: -6, rumorCredibility: 6, mood: 2, stress: 4 })
+    const generatedDecoy = payload?.decoy
+    const naverTitle = generatedDecoy?.title || `${decoy.artist} ${decoy.clue} 의혹 확산`
+    const naverSummary = generatedDecoy?.summary || `娱乐社区突然出现${decoy.artist}相关热帖，关键词从${s.maleLead.stageName}的时间线转向“${decoy.clue}”。不少路人开始去围观别人的瓜。`
+    const weverseTitle = generatedDecoy?.weverseTitle || '갑자기 다른 열애설이 뜬 거 이상하지 않아?'
+    const weverseContent = generatedDecoy?.weverseContent || `突然有别人的绯闻冲上热搜，${s.maleLead.stageName}相关词掉下去了。有人说是巧合，也有人怀疑这是买热搜挡枪。`
+    const relatedSearchWords = generatedDecoy?.relatedSearchWords?.length ? generatedDecoy.relatedSearchWords : decoy.words
+    s = appendNaver(s, {
+      title: naverTitle,
+      summary: naverSummary,
+      source: '실시간 이슈',
+      heat: 88,
+      relatedSearchWords,
+      commentList: buildCommentList(s, 'naver', naverSummary, naverTitle, 12),
+    })
+    s = appendWeverse(s, {
+      type: 'conspiracy',
+      author: 'trend_watcher',
+      title: weverseTitle,
+      content: weverseContent,
+      heat: 67,
+      comments: 340,
+      commentList: buildCommentList(s, 'weverse', weverseContent, weverseTitle, 20),
+      isPlayerAlt: false,
+      relatedEvidenceIds: [],
+    })
+    feedback = '你买了别人的热搜，注意力被带走，但“买榜挡枪”的阴谋论也开始出现。'
+  } else if (strategy === 'teammate_fanservice') {
+    s = applyStatChanges(s, { publicHeat: -9, fanSuspicion: -7, careerPressure: 6, trust: 2, companyAlert: 3, popularity: 2 })
+    s = appendInstagramPost(s, {
+      author: 'teammate',
+      authorName: `${s.maleLead.stageName} x 팀메이트`,
+      contentType: 'reel',
+      text: '연습 끝. 오늘도 같이 버텼다.\n练习结束。今天也一起撑过来了。',
+      imageTags: ['studio', 'backstage', 'team'],
+      visibility: 'public',
+      riskScore: 10,
+      likes: 18000 + s.risk.publicHeat * 300,
+      comments: buildCommentList(s, 'instagram', '练习结束。今天也一起撑过来了。队友互动片段被粉丝剪成CP向。', '队友营业挡枪', 10),
+      views: 120000 + s.risk.publicHeat * 1500,
+      isDeleted: false,
+      isScreenshotted: false,
+      screenshottedBy: [],
+      boyfriendViewed: false,
+    })
+    s = appendWeverse(s, {
+      type: 'sugar',
+      author: 'teamchemistry_zip',
+      title: '오늘 유닛 케미 미쳤다',
+      content: `队友互动片段开始扩散，评论区转去嗑舞台chemistry。恋爱词被短暂压下，但队友粉内部也有人不满“别拿成员挡枪”。`,
+      heat: 74,
+      comments: 410,
+      commentList: buildCommentList(s, 'weverse', '队友互动片段开始扩散，粉丝转去嗑舞台chemistry，也有人不满拿成员挡枪。', '오늘 유닛 케미 미쳤다', 8),
+      isPlayerAlt: false,
+      relatedEvidenceIds: [],
+    })
+    s = boyfriendMessage(s, '오늘은 멤버랑 좀 붙어 있을게. 네 얘기 덮으려고 그런 거 알지.', '今天我会和队友多互动一点。你知道我是为了把你的事盖过去。', 'guilty', 'warning')
+    feedback = '他用队友营业挡枪，恋爱词短暂降温，但队友粉和公司都会看见这一步。'
   } else if (strategy === 'control_narrative') {
     return performAltControl(playerActions.alt_account_control, state)
   } else if (strategy === 'confront') {
@@ -1052,7 +1190,7 @@ export function performPlayerAction(
   state: GameState
 ): { state: GameState; trace: Trace; feedback: string } {
   if (actionId.startsWith('crisis_')) {
-    const result = performCrisisStrategy(actionId, state)
+    const result = performCrisisStrategy(actionId, state, payload)
     const trace = result.state.traces[result.state.traces.length - 1] || {
       id: rid('trace'),
       type: actionId,

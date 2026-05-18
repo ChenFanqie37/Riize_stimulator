@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { AlertTriangle, MessageCircle, Flame, ArrowLeft } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
-import type { WeversePostType, WeversePost } from '@/types/game'
+import type { WeversePostType } from '@/types/game'
 import { TranslateText, parseMixedText } from '../../Common/TranslateText'
 import AppAccountBar from '../../Common/AppAccountBar'
+import { commentsForWeversePost, type SocialAgentComment } from '@/engine/socialAgents'
 
 const typeConfig: Record<WeversePostType, { label: string; color: string; bg: string }> = {
   sugar: { label: '嗑糖', color: '#EC4899', bg: '#FDF2F8' },
@@ -18,52 +19,18 @@ const typeConfig: Record<WeversePostType, { label: string; color: string; bg: st
 
 const allTypes: WeversePostType[] = ['sugar', 'analysis', 'breakdown', 'control', 'conspiracy', 'anti', 'fansite', 'timeline']
 
-function generateWeverseComments(post: WeversePost, fanSuspicion: number): { author: string; text: string; stance: 'sugar' | 'analysis' | 'anti' | 'neutral' }[] {
-  const comments: { author: string; text: string; stance: 'sugar' | 'analysis' | 'anti' | 'neutral' }[] = []
-
-  switch (post.type) {
-    case 'sugar':
-      comments.push({ author: 'sugar_mom', text: '이 커플 너무 예뻐요 😭💕', stance: 'sugar' })
-      comments.push({ author: 'realist_fan', text: '그냥 친한 사이일 수도 있잖아요', stance: 'neutral' })
-      break
-    case 'analysis':
-      comments.push({ author: 'detail_person', text: '이 타임라인 보면 확실히 겹치는데...', stance: 'analysis' })
-      comments.push({ author: 'chill_briize', text: '분석 너무 깊게 들어가는 거 아냐?', stance: 'neutral' })
-      break
-    case 'conspiracy':
-      comments.push({ author: 'truth_seeker', text: '이건 뭔가 있어!! 진실이 곧 나올 것이다', stance: 'analysis' })
-      comments.push({ author: 'sane_person', text: '음모론 그만... 팬들 이미지 안 좋아져', stance: 'anti' })
-      break
-    case 'anti':
-      comments.push({ author: 'hater_1', text: '아이돌 연애하면 팬 배신인데', stance: 'anti' })
-      comments.push({ author: 'defender', text: '연애 자유입니다. 그만 좀 하세요', stance: 'sugar' })
-      break
-    default:
-      comments.push({ author: 'briize_1', text: 'RIIZE 화이팅! 💪', stance: 'sugar' })
-      comments.push({ author: 'passerby', text: '글쎄요...', stance: 'neutral' })
-  }
-
-  if (fanSuspicion > 50) {
-    comments.push({ author: 'worried_fan', text: '진짜 연애 중이면 어떡하지... 😢', stance: 'analysis' })
-  }
-  if (post.heat > 70) {
-    comments.push({ author: 'troll_99', text: '이거 터지면 대박 ㅋㅋ', stance: 'anti' })
-  }
-  comments.push({ author: 'newbie_fan', text: '무슨 일이에요? 새 팬이라 모르겠어요', stance: 'neutral' })
-
-  return comments.slice(0, 6)
-}
-
-const weverseStanceConfig: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  sugar: { label: '嗑糖', color: '#EC4899', bg: '#FDF2F8', icon: '💕' },
-  analysis: { label: '分析', color: '#3B82F6', bg: '#EFF6FF', icon: '🔍' },
-  anti: { label: '黑粉', color: '#6B7280', bg: '#F3F4F6', icon: '🚫' },
-  neutral: { label: '路人', color: '#9CA3AF', bg: '#F9FAFB', icon: '💬' },
+const roleConfig: Record<SocialAgentComment['role'], { label: string; color: string; bg: string }> = {
+  fan: { label: '粉丝', color: '#EC4899', bg: '#FDF2F8' },
+  anti: { label: '黑粉', color: '#DC2626', bg: '#FEF2F2' },
+  passerby: { label: '路人', color: '#6B7280', bg: '#F9FAFB' },
+  company: { label: '公司', color: '#2563EB', bg: '#EFF6FF' },
+  paparazzi: { label: '狗仔', color: '#D97706', bg: '#FFFBEB' },
+  teammateFan: { label: '队友粉', color: '#8B5CF6', bg: '#F5F3FF' },
 }
 
 export default function PostFeed() {
-  const posts = useGameStore((s) => s.weverse.posts)
-  const fanSuspicion = useGameStore((s) => s.risk.fanSuspicion)
+  const state = useGameStore()
+  const posts = state.weverse.posts
   const [filter, setFilter] = useState<WeversePostType | 'all'>('all')
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
 
@@ -76,7 +43,7 @@ export default function PostFeed() {
       return null
     }
     const cfg = typeConfig[post.type]
-    const comments = generateWeverseComments(post, fanSuspicion)
+    const comments = commentsForWeversePost(post, state)
     return (
       <div className="flex flex-col h-full bg-white">
         <div className="px-4 py-2.5 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #00B4D8, #00D4FF)' }}>
@@ -134,7 +101,7 @@ export default function PostFeed() {
             <p className="text-xs font-semibold text-gray-700 mb-2">评论</p>
             <div className="flex flex-col gap-2">
               {comments.map((c, i) => {
-                const sCfg = weverseStanceConfig[c.stance]
+                const sCfg = roleConfig[c.role]
                 return (
                   <div key={i} className="flex items-start gap-2">
                     <div
@@ -150,7 +117,7 @@ export default function PostFeed() {
                           className="text-[9px] px-1 py-0.5 rounded font-medium"
                           style={{ backgroundColor: sCfg.bg, color: sCfg.color }}
                         >
-                          {sCfg.icon} {sCfg.label}
+                          {sCfg.label}
                         </span>
                       </div>
                       <TranslateText {...parseMixedText(c.text)} koStyle={{ fontSize: '11px' }} />

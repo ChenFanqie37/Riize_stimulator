@@ -1,4 +1,4 @@
-import { X, MessageCircle, Camera, Heart, Search, Briefcase, Eye, Calendar, Image, FileText, Activity } from 'lucide-react'
+import { X, MessageCircle, Camera, Heart, Search, Briefcase, Eye, Calendar, Image, FileText, Activity, MapPinned } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { AppName, Notification } from '@/types/game'
 import type { LucideIcon } from 'lucide-react'
@@ -10,6 +10,7 @@ const appIcons: Record<AppName, LucideIcon> = {
   naver: Search,
   companyNotice: Briefcase,
   dispatch: Eye,
+  offline: MapPinned,
   calendar: Calendar,
   gallery: Image,
   notes: FileText,
@@ -23,6 +24,7 @@ const appColors: Record<AppName, string> = {
   naver: '#03C75A',
   companyNotice: '#EF4444',
   dispatch: '#F97316',
+  offline: '#0EA5E9',
   calendar: '#FFFFFF',
   gallery: '#A855F7',
   notes: '#D4C5A9',

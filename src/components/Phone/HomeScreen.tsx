@@ -11,6 +11,7 @@ import {
   Activity,
   BarChart3,
   Zap,
+  MapPinned,
 } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { AppName } from '@/types/game'
@@ -31,6 +32,7 @@ const apps: AppItem[] = [
   { id: 'naver', name: 'Naver', icon: Search, color: '#03C75A' },
   { id: 'companyNotice', name: 'Company', icon: Briefcase, color: '#EF4444' },
   { id: 'dispatch', name: 'Dispatch', icon: Eye, color: '#F97316' },
+  { id: 'offline', name: '线下', icon: MapPinned, color: '#0EA5E9' },
   { id: 'calendar', name: 'Calendar', icon: Calendar, color: '#FFFFFF' },
   { id: 'gallery', name: 'Gallery', icon: Image, color: '#A855F7' },
   { id: 'notes', name: 'Notes', icon: FileText, color: '#D4C5A9' },
@@ -58,6 +60,8 @@ function getUnreadCount(appId: AppName | 'stats' | 'actions', state: ReturnType<
       return state.companyNotice.notices.filter((n) => !n.isRead).length + appNotifications
     case 'dispatch':
       return appNotifications
+    case 'offline':
+      return appNotifications
     case 'calendar':
       return appNotifications
     case 'gallery':
@@ -78,6 +82,7 @@ export default function HomeScreen() {
   const weather = state.weather
   const week = state.week
   const day = state.day
+  const hour = String(state.hour ?? 8).padStart(2, '0')
 
   const handleAppClick = (appId: AppName | 'stats' | 'actions') => {
     if (appId !== 'stats' && appId !== 'actions') {
@@ -94,7 +99,7 @@ export default function HomeScreen() {
     >
       <div className="flex flex-col items-center pt-6 pb-4 relative z-10">
         <p className="text-[#1C1C1E]/50 text-xs">
-          Week {week} · Day {day}
+          Week {week} · Day {day} · {hour}:30
         </p>
         <p className="text-[#1C1C1E]/30 text-[10px] mt-0.5">{weather}</p>
       </div>

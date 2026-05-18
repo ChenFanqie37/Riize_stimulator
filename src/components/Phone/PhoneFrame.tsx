@@ -9,6 +9,7 @@ const appNames: Record<string, string> = {
   naver: 'Naver',
   companyNotice: 'Company Notice',
   dispatch: 'Dispatch',
+  offline: '线下',
   calendar: 'Calendar',
   gallery: 'Gallery',
   notes: 'Notes',
