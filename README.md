@@ -13,7 +13,7 @@
 - **线下 App 增强**：演唱会、签售、预录、音乐节、机场、打歌下班、公司咖啡厅、品牌快闪、校园公开活动都可追。
 - **“嫂子特权”但有代价**：部分线下可以让男主安排入场，通常更省钱、更甜，但会提高公司警觉、粉丝怀疑、狗仔线索或通行记录风险。
 - **社交智能体评论**：粉丝、黑粉、路人、公司、狗仔、队友粉会根据帖子内容生成不同评论。
-- **后端代理**：浏览器不再保存 API key，统一请求本地/服务器代理，由代理读取 `apikey.txt` 并轮换密钥。
+- **直接 API 设置**：在设置面板填写 API Key、API 地址和模型名，剧情、聊天、评论都会继续走 LLM。
 
 ## 核心循环
 
@@ -59,21 +59,15 @@
 
 “让他安排”通常需要达到对应好感度和信任值。安排成功后会生成一段现场正文、一条男主消息、相册照片、证据碎片、通知和剧情钩子。
 
-## AI 与代理
+## AI 配置
 
-前端只请求 `/api/chat/completions`，真实 API key 留在后端。
+打开游戏右上角设置，填写：
 
-### 密钥文件
+- API Key：可以一行一个，前端会轮换使用。
+- API 地址：默认 `https://api.deepseek.com`。
+- 模型名称：默认 `deepseek-chat`。
 
-在项目根目录创建或更新：
-
-```text
-apikey.txt
-```
-
-每行放一个 key，代理会自动读取、去重、轮换使用。多个玩家连同一个代理时，会共享这一组 key 的额度和限流池，但不会共享各自浏览器里的存档和剧情状态。
-
-### 环境变量
+也可以用 `.env` 给本机开发提供默认值。
 
 复制 `.env.example`：
 
@@ -84,14 +78,10 @@ cp .env.example .env
 常用配置：
 
 ```env
-PORT=8787
-API_BASE_URL=https://api.deepseek.com
-API_MODEL=deepseek-chat
-API_KEY_FILE=apikey.txt
-VITE_PROXY_URL=/api
+VITE_API_KEYS=
+VITE_API_BASE_URL=https://api.deepseek.com
+VITE_API_MODEL=deepseek-chat
 ```
-
-如果正式分享，建议设置 `PROXY_ACCESS_TOKEN`，并只把前端地址分享给朋友，不要分享 `apikey.txt`。
 
 ## 启动
 
@@ -101,7 +91,7 @@ VITE_PROXY_URL=/api
 npm install
 ```
 
-开发模式，代理和 Vite 一起启动：
+开发模式：
 
 ```bash
 npm run dev
@@ -119,7 +109,7 @@ npm run dev:client
 npm run build
 ```
 
-启动后端代理并托管 `dist`：
+预览生产构建：
 
 ```bash
 npm run start
@@ -141,7 +131,6 @@ npm run check
 | Vite | 构建 |
 | Tailwind CSS | 样式 |
 | Lucide React | 图标 |
-| Node HTTP server | 后端代理和静态托管 |
 | DeepSeek/OpenAI-compatible API | 剧情、聊天和评论生成 |
 
 ## 重要免责声明

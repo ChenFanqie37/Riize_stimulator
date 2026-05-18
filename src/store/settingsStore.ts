@@ -4,15 +4,15 @@ interface SettingsState {
   showTranslation: boolean
   language: 'zh' | 'ko'
   fontSize: 'small' | 'medium' | 'large'
-  apiProxyUrl: string
-  proxyAccessToken: string
+  apiKeys: string[]
+  apiBaseUrl: string
   apiModel: string
   hasApiKey: () => boolean
   toggleTranslation: () => void
   setLanguage: (lang: 'zh' | 'ko') => void
   setFontSize: (size: 'small' | 'medium' | 'large') => void
-  setApiProxyUrl: (url: string) => void
-  setProxyAccessToken: (token: string) => void
+  setApiKeys: (keys: string[]) => void
+  setApiBaseUrl: (url: string) => void
   setApiModel: (model: string) => void
 }
 
@@ -30,30 +30,44 @@ function saveToStorage(key: string, value: any) {
   } catch {}
 }
 
+function envApiKeys(): string[] {
+  return [
+    import.meta.env.VITE_API_KEYS || '',
+    import.meta.env.VITE_API_KEY_1 || '',
+    import.meta.env.VITE_API_KEY_2 || '',
+    import.meta.env.VITE_API_KEY_3 || '',
+    import.meta.env.VITE_API_KEY_4 || '',
+  ].join('\n')
+    .split(/[\n,;]+/)
+    .map((key) => key.trim())
+    .filter(Boolean)
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   showTranslation: true,
   language: 'zh',
   fontSize: 'medium',
-  apiProxyUrl: loadFromStorage<string>('riize_api_proxy_url', '') || import.meta.env.VITE_PROXY_URL || '/api',
-  proxyAccessToken: loadFromStorage<string>('riize_proxy_access_token', '') || import.meta.env.VITE_PROXY_ACCESS_TOKEN || '',
+  apiKeys: loadFromStorage<string[]>('riize_api_keys', envApiKeys()),
+  apiBaseUrl: loadFromStorage<string>('riize_api_base_url', '') || import.meta.env.VITE_API_BASE_URL || 'https://api.deepseek.com',
   apiModel: loadFromStorage<string>('riize_api_model', '') || import.meta.env.VITE_API_MODEL || 'deepseek-chat',
 
   hasApiKey: () => {
-    return get().apiProxyUrl.trim().length > 0
+    return get().apiKeys.some((key) => key.trim().length > 0)
   },
 
   toggleTranslation: () => set((s) => ({ showTranslation: !s.showTranslation })),
   setLanguage: (lang) => set({ language: lang }),
   setFontSize: (size) => set({ fontSize: size }),
 
-  setApiProxyUrl: (url) => {
-    saveToStorage('riize_api_proxy_url', url)
-    set({ apiProxyUrl: url })
+  setApiKeys: (keys) => {
+    const cleanKeys = keys.map((key) => key.trim()).filter(Boolean)
+    saveToStorage('riize_api_keys', cleanKeys)
+    set({ apiKeys: cleanKeys })
   },
 
-  setProxyAccessToken: (token) => {
-    saveToStorage('riize_proxy_access_token', token)
-    set({ proxyAccessToken: token })
+  setApiBaseUrl: (url) => {
+    saveToStorage('riize_api_base_url', url)
+    set({ apiBaseUrl: url })
   },
 
   setApiModel: (model) => {

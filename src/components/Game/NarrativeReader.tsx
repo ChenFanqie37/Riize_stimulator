@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Send, Sparkles } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { generateNarrativeTurn, resolveNarrativeChoice } from '@/engine/gemini'
@@ -42,12 +42,18 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
   const [loading, setLoading] = useState(false)
   const [freeInput, setFreeInput] = useState('')
 
-  const turn = activeTurn || createFallbackNarrativeTurn(state, source)
+  useEffect(() => {
+    if (!activeTurn) {
+      setActiveNarrativeTurn(createFallbackNarrativeTurn(useGameStore.getState(), source))
+    }
+  }, [activeTurn, setActiveNarrativeTurn, source])
+
+  const turn = activeTurn
   const header = useMemo(() => ({
-    scene: turn.scene || '首尔某处',
+    scene: turn?.scene || '首尔某处',
     maleLead: `${state.maleLead.name}（${state.maleLead.stageName}）`,
     relationship: stageLabels[state.maleLead.relationshipStage] || state.maleLead.relationshipStage,
-  }), [turn.scene, state.maleLead.name, state.maleLead.stageName, state.maleLead.relationshipStage])
+  }), [turn?.scene, state.maleLead.name, state.maleLead.stageName, state.maleLead.relationshipStage])
 
   const startTurn = async () => {
     setLoading(true)
@@ -62,6 +68,7 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
   }
 
   const choose = async (choice: NarrativeChoice) => {
+    if (!turn) return
     if (choice.freeInput && !freeInput.trim()) return
     setLoading(true)
     const current = useGameStore.getState()
@@ -81,6 +88,16 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
       setFreeInput('')
       setLoading(false)
     }
+  }
+
+  if (!turn) {
+    return (
+      <div className={`flex flex-col ${compact ? 'h-full' : 'min-h-[70vh]'} bg-white text-[#1C1C1E]`}>
+        <div className="flex-1 px-5 py-5 text-sm leading-7 text-[#8E8E93]">
+          首尔的清晨正在展开。
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -161,7 +178,7 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center">
           <div className="rounded-full bg-white shadow-lg px-4 py-2 text-xs text-blue-600 flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
-            正在续写这一段...
+            这一刻正在延伸...
           </div>
         </div>
       )}

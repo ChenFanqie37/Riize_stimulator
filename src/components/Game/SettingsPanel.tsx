@@ -1,4 +1,4 @@
-import { X, Languages, Type, Globe, Key, CheckCircle, AlertCircle, Server, Cpu, Lock } from 'lucide-react'
+import { X, Languages, Type, Globe, Key, CheckCircle, AlertCircle, Cpu, Link } from 'lucide-react'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useState } from 'react'
 
@@ -11,18 +11,19 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const showTranslation = useSettingsStore((s) => s.showTranslation)
   const fontSize = useSettingsStore((s) => s.fontSize)
   const language = useSettingsStore((s) => s.language)
-  const apiProxyUrl = useSettingsStore((s) => s.apiProxyUrl)
-  const proxyAccessToken = useSettingsStore((s) => s.proxyAccessToken)
+  const apiKeys = useSettingsStore((s) => s.apiKeys)
+  const apiBaseUrl = useSettingsStore((s) => s.apiBaseUrl)
   const apiModel = useSettingsStore((s) => s.apiModel)
   const toggleTranslation = useSettingsStore((s) => s.toggleTranslation)
   const setFontSize = useSettingsStore((s) => s.setFontSize)
   const setLanguage = useSettingsStore((s) => s.setLanguage)
-  const setApiProxyUrl = useSettingsStore((s) => s.setApiProxyUrl)
-  const setProxyAccessToken = useSettingsStore((s) => s.setProxyAccessToken)
+  const setApiKeys = useSettingsStore((s) => s.setApiKeys)
+  const setApiBaseUrl = useSettingsStore((s) => s.setApiBaseUrl)
   const setApiModel = useSettingsStore((s) => s.setApiModel)
 
   const [testResult, setTestResult] = useState<'idle' | 'testing' | 'success' | 'fail'>('idle')
   const [testError, setTestError] = useState('')
+  const [keyText, setKeyText] = useState(apiKeys.join('\n'))
 
   if (!isOpen) return null
 
@@ -32,25 +33,32 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     { key: 'large', label: '大' },
   ]
 
-  const proxyUrl = (apiProxyUrl.trim() || '/api').replace(/\/+$/, '')
-  const hasProxy = proxyUrl.length > 0
+  const cleanKeys = keyText
+    .split(/[\n,;]+/)
+    .map((key) => key.trim())
+    .filter(Boolean)
+  const hasKey = cleanKeys.length > 0
+  const endpoint = (apiBaseUrl.trim() || 'https://api.deepseek.com').replace(/\/+$/, '')
+
+  const handleSaveKeys = () => {
+    setApiKeys(cleanKeys)
+    setTestResult('idle')
+    setTestError('')
+  }
 
   const handleTestConnection = async () => {
     setTestResult('testing')
     setTestError('')
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
+      if (!hasKey) throw new Error('请先填写 API Key')
 
-      if (proxyAccessToken.trim()) {
-        headers['X-Proxy-Access-Token'] = proxyAccessToken.trim()
-      }
-
-      const response = await fetch(`${proxyUrl}/chat/completions`, {
+      const response = await fetch(`${endpoint}/chat/completions`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanKeys[0]}`,
+        },
         body: JSON.stringify({
           model: apiModel || 'deepseek-chat',
           messages: [{ role: 'user', content: 'Hi' }],
@@ -60,6 +68,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
       if (response.ok) {
         setTestResult('success')
+        setApiKeys(cleanKeys)
       } else {
         const errText = await response.text().catch(() => '')
         setTestResult('fail')
@@ -98,29 +107,43 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Key size={16} style={{ color: '#f59e0b' }} />
-              <span className="text-[#1C1C1E]/80 text-sm font-medium">续写代理</span>
-              {hasProxy ? (
+              <span className="text-[#1C1C1E]/80 text-sm font-medium">API Key</span>
+              {hasKey ? (
                 <CheckCircle size={14} style={{ color: '#34C759' }} />
               ) : (
                 <AlertCircle size={14} style={{ color: '#FF3B30' }} />
               )}
             </div>
 
-            <div
-              className="mb-3 p-3 rounded-xl text-xs leading-relaxed"
+            <textarea
+              value={keyText}
+              onChange={(event) => setKeyText(event.target.value)}
+              onBlur={handleSaveKeys}
+              placeholder="每行一个 API Key"
+              rows={4}
+              className="w-full px-3 py-2 rounded-xl text-xs outline-none resize-none"
               style={{
-                background: 'rgba(245,158,11,0.08)',
-                border: '1px solid rgba(245,158,11,0.15)',
-                color: 'rgba(28,28,30,0.68)',
+                background: '#FFFFFF',
+                border: '1px solid rgba(0,0,0,0.08)',
+                color: '#1C1C1E',
               }}
-            >
-              浏览器只连接后端代理，真实 API Key 由服务器从 apikey.txt 读取并轮换。
-            </div>
+            />
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={handleSaveKeys}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all"
+                style={{
+                  background: 'rgba(0,0,0,0.04)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  color: 'rgba(28,28,30,0.6)',
+                }}
+              >
+                保存 Key
+              </button>
               <button
                 onClick={handleTestConnection}
-                disabled={!hasProxy || testResult === 'testing'}
+                disabled={!hasKey || testResult === 'testing'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all disabled:opacity-30"
                 style={{
                   background: testResult === 'success'
@@ -153,33 +176,14 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Server size={16} style={{ color: '#6366f1' }} />
-              <span className="text-[#1C1C1E]/80 text-sm">代理地址</span>
+              <Link size={16} style={{ color: '#6366f1' }} />
+              <span className="text-[#1C1C1E]/80 text-sm">API 地址</span>
             </div>
             <input
               type="text"
-              value={apiProxyUrl}
-              onChange={(e) => setApiProxyUrl(e.target.value)}
-              placeholder="/api"
-              className="w-full px-3 py-2 rounded-xl text-xs outline-none"
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid rgba(0,0,0,0.08)',
-                color: '#1C1C1E',
-              }}
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Lock size={16} style={{ color: '#0ea5e9' }} />
-              <span className="text-[#1C1C1E]/80 text-sm">访问口令</span>
-            </div>
-            <input
-              type="password"
-              value={proxyAccessToken}
-              onChange={(e) => setProxyAccessToken(e.target.value)}
-              placeholder="没有设置可留空"
+              value={apiBaseUrl}
+              onChange={(event) => setApiBaseUrl(event.target.value)}
+              placeholder="https://api.deepseek.com"
               className="w-full px-3 py-2 rounded-xl text-xs outline-none"
               style={{
                 background: '#FFFFFF',
@@ -197,7 +201,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             <input
               type="text"
               value={apiModel}
-              onChange={(e) => setApiModel(e.target.value)}
+              onChange={(event) => setApiModel(event.target.value)}
               placeholder="deepseek-chat"
               className="w-full px-3 py-2 rounded-xl text-xs outline-none"
               style={{

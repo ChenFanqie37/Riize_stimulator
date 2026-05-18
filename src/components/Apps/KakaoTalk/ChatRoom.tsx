@@ -16,7 +16,7 @@ const categoryConfig: Record<MessageCategory, { icon: string; label: string; bg:
 function inferCategory(msg: ChatMessage): MessageCategory | null {
   if (msg.category) return msg.category
   if (msg.isVoice) return 'call_record'
-  if (msg.sender === 'npc' && msg.senderName !== msg.senderName) return 'system'
+  if (msg.sender === 'npc' && (msg.senderName === '提示' || msg.senderName === '系统')) return 'system'
   if (msg.emotion === 'sweet' || msg.emotion === 'vulnerable') return 'sweet'
   if (msg.emotion === 'anxious' || msg.emotion === 'jealous' || msg.emotion === 'guilty') return 'emotional'
   if (msg.emotion === 'angry' || msg.emotion === 'cold' || msg.emotion === 'avoidant') return 'warning'
@@ -152,18 +152,19 @@ export default function ChatRoom() {
           maleLead.name.charAt(0)
         )
       } catch {
-        const fallbackMsg: ChatMessage = {
-          id: `msg_${Date.now()}`,
-          sender: 'boyfriend',
-          senderName: maleLead.name,
-          textKo: '...',
-          textZh: '...',
+        const failedMsg: ChatMessage = {
+          id: `msg_failed_${Date.now()}`,
+          sender: 'npc',
+          senderName: '提示',
+          textKo: '',
+          textZh: '消息暂时没有送达。等一会儿再发，或者换一句更具体的话试试。',
           timestamp: Date.now(),
           isRead: true,
           isRecalled: false,
           emotion: 'neutral',
+          category: 'system',
         }
-        receiveMessage(thread.id, fallbackMsg)
+        receiveMessage(thread.id, failedMsg)
       } finally {
         setLocalTyping(false)
       }
@@ -338,6 +339,17 @@ export default function ChatRoom() {
               }
 
               const isPlayer = msg.sender === 'player'
+              const isSystem = inferCategory(msg) === 'system'
+
+              if (isSystem) {
+                return (
+                  <div key={msg.id} className="flex justify-center my-2">
+                    <span className="max-w-[82%] text-[11px] leading-relaxed text-gray-600 bg-black/5 rounded-xl px-3 py-1.5 text-center">
+                      {msg.textZh || msg.textKo}
+                    </span>
+                  </div>
+                )
+              }
 
               return (
                 <div key={msg.id} className={`flex ${isPlayer ? 'justify-end' : 'justify-start'} mb-2`}>

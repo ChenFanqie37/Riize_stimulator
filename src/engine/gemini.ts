@@ -11,14 +11,22 @@ import type {
 } from '../types/game'
 import { useSettingsStore } from '../store/settingsStore'
 
+let keyIndex = 0
+
 function getRuntimeConfig() {
   const state = useSettingsStore.getState()
-  const proxyUrl = (state.apiProxyUrl || '/api').replace(/\/+$/, '')
   return {
-    endpoint: `${proxyUrl}/chat/completions`,
+    keys: state.apiKeys.length > 0 ? state.apiKeys : ['YOUR_API_KEY_HERE'],
+    baseUrl: (state.apiBaseUrl || 'https://api.deepseek.com').replace(/\/+$/, ''),
     model: state.apiModel || 'deepseek-chat',
-    accessToken: state.proxyAccessToken.trim(),
   }
+}
+
+function getNextKey(): string {
+  const config = getRuntimeConfig()
+  const key = config.keys[keyIndex % config.keys.length]
+  keyIndex += 1
+  return key
 }
 
 export interface ChatContext {
@@ -164,20 +172,22 @@ export interface NarrativeResolutionContext {
   freeInput?: string
 }
 
-async function callLLMWithRetry(prompt: string, retries: number = 3): Promise<string> {
+async function callLLMWithRetry(prompt: string, retries: number = 1): Promise<string> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const config = getRuntimeConfig()
+      const key = getNextKey()
+      const controller = new AbortController()
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 12000)
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-      }
-      if (config.accessToken) {
-        headers['X-Proxy-Access-Token'] = config.accessToken
+        Authorization: `Bearer ${key}`,
       }
 
-      const response = await fetch(config.endpoint, {
+      const response = await fetch(`${config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
+        signal: controller.signal,
         body: JSON.stringify({
           model: config.model,
           messages: [
@@ -187,10 +197,10 @@ async function callLLMWithRetry(prompt: string, retries: number = 3): Promise<st
           top_p: 0.95,
           max_tokens: 2048
         })
-      })
+      }).finally(() => globalThis.clearTimeout(timeoutId))
       if (!response.ok) {
         if (response.status === 429 && attempt < retries - 1) {
-          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
           continue
         }
         const errBody = await response.text().catch(() => '')
@@ -202,7 +212,7 @@ async function callLLMWithRetry(prompt: string, retries: number = 3): Promise<st
       return text
     } catch (error) {
       if (attempt === retries - 1) throw error
-      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
     }
   }
   throw new Error('All retries failed')
@@ -301,51 +311,6 @@ Rules:
   return callLLMStructured<{ messageZh: string; advice: string; moodEffect: number }>(prompt)
 }
 
-const riskLoopWords = ['被发现', '曝光', '粉丝', '公司', '狗仔', '私生', '热搜', '截图', '小心', '危险', '删掉', '撤回', '动线', 'Dispatch', 'D社']
-
-function countRiskWords(text: string): number {
-  return riskLoopWords.reduce((count, word) => count + (text.includes(word) ? 1 : 0), 0)
-}
-
-function isLoopingRiskLine(text: string): boolean {
-  return /被发现.*怎么办|怎么办.*被发现|会不会被发现|别.*联系|先别.*联系|别.*发|删.*掉/.test(text)
-}
-
-function romanticFallback(context: ChatContext): LLMResponse {
-  const warmLine = context.affection >= 45
-    ? '我刚刚排练的时候又想到你了。明明手机放在旁边不能看，还是一直想知道你在干嘛。'
-    : '我刚刚有点走神。不是因为别的，是突然想到你刚才那句话。'
-  const personaLine: Record<string, string> = {
-    true_love: '等忙完我想听你说话，什么都行，你声音会让我安心。',
-    career_freak: '今晚我可能只能回得慢一点，但不是不想你，是怕一回你就停不下来。',
-    avoidant: '我不太会说好听的。可是你一出现，我节奏就乱了。',
-    central_ac: '你是不是故意的？一句话就让我表情管理失败。',
-    playboy: '你再这样发消息，我真的会忍不住找借口见你。',
-    narcissist: '今天有没有想我？要说实话，我想听你亲口说。',
-    secret_trauma: '别突然不回我。你在的话，我会安静一点。',
-  }
-  return {
-    messageKo: '방금 또 네 생각했어. 답장 느려도 모르는 척 하지 마.',
-    messageZh: `${warmLine}${personaLine[context.boyfriendPersona] || '等我一下，忙完就找你。'}`,
-    emotion: context.affection >= 45 ? 'sweet' : 'vulnerable',
-    intent: '把话题从风险拉回私密暧昧和当下情绪',
-    statChanges: { affection: 1, trust: 0, mood: 1, secrecy: 0, companyAlert: 0, fanSuspicion: 0 },
-    possibleTrigger: '',
-  }
-}
-
-function softenRiskLoop(reply: LLMResponse, context: ChatContext, criticalRisk: boolean): LLMResponse {
-  const riskWordCount = countRiskWords(reply.messageZh || '') + countRiskWords(reply.messageKo || '')
-  const looping = isLoopingRiskLine(reply.messageZh || '')
-  const shouldAvoidRisk = !context.playerAskedAboutRisk && (context.riskMentionsRecently >= 2 || !criticalRisk)
-
-  if (shouldAvoidRisk && (riskWordCount >= 2 || looping || (context.riskMentionsRecently >= 2 && riskWordCount > 0))) {
-    return romanticFallback(context)
-  }
-
-  return reply
-}
-
 export async function generateChatReply(context: ChatContext): Promise<LLMResponse> {
   const criticalRisk = context.fanSuspicion >= 78
     || context.companyAlert >= 75
@@ -440,7 +405,13 @@ Rules:
 - Only include statChanges that are relevant to this interaction`
 
   const reply = await callLLMStructured<LLMResponse>(prompt)
-  return softenRiskLoop(reply, context, criticalRisk)
+  const normalized = `${reply.messageZh || ''}${reply.messageKo || ''}`
+    .replace(/[.\s。…·\-—_~～]+/g, '')
+    .trim()
+  if (normalized.length < 2) {
+    throw new Error('Empty chat reply')
+  }
+  return reply
 }
 
 export async function generateStoryEvent(context: StoryContext): Promise<GameEvent> {

@@ -116,7 +116,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
       })
       if (llmComments.length > 0) generatedComments = llmComments
     } catch {
-      // Fall back to local agents when the proxy/LLM is unavailable.
+      // Fall back to local agents when the LLM is unavailable.
     }
 
     const post: InstagramPost = {
