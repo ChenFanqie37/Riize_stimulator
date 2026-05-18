@@ -290,7 +290,7 @@ export default function CharacterCreation() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <h3 className="text-[#1C1C1E] font-bold text-sm">剧情偏好</h3>
+              <h3 className="text-[#1C1C1E] font-bold text-sm">走向偏好</h3>
               <div className="flex flex-wrap gap-2">
                 {plotPreferenceOptions.map((opt) => (
                   <button

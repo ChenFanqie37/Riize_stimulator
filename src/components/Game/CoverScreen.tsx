@@ -64,7 +64,7 @@ export default function CoverScreen() {
           className="cover-title text-4xl md:text-6xl font-extralight tracking-wider text-[#1A1A1A] text-center"
           style={{ letterSpacing: '0.15em' }}
         >
-          嫂嫂模拟器
+          嫂嫂生存手记
         </h1>
 
         <div className="cover-line w-48 md:w-64 h-[2px] mt-6 mb-5 origin-center"
@@ -101,7 +101,7 @@ export default function CoverScreen() {
           >
             <span className="text-white text-[8px] font-bold">R</span>
           </div>
-          <span className="text-[10px] tracking-[0.2em] text-[#CCCCCC] font-light">嫂嫂 SIMULATOR</span>
+          <span className="text-[10px] tracking-[0.2em] text-[#CCCCCC] font-light">SECRET RIIZE DIARY</span>
         </div>
       </div>
     </div>

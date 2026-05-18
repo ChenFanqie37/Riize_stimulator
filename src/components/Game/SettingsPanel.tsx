@@ -98,7 +98,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Key size={16} style={{ color: '#f59e0b' }} />
-              <span className="text-[#1C1C1E]/80 text-sm font-medium">AI 代理</span>
+              <span className="text-[#1C1C1E]/80 text-sm font-medium">续写代理</span>
               {hasProxy ? (
                 <CheckCircle size={14} style={{ color: '#34C759' }} />
               ) : (

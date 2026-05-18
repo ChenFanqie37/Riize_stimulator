@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Camera, Trash2, Phone, MapPin, Ban, Search, Shield, Coffee, Megaphone, Sparkles } from 'lucide-react'
+import { X, Camera, Trash2, Phone, MapPin, Ban, Search, Shield, Coffee, Megaphone, Sparkles, Briefcase, WalletCards, Ticket } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { getIdentityIncidentScript } from '@/data/identityGameplay'
 import type { LucideIcon } from 'lucide-react'
@@ -105,6 +105,33 @@ const actions: ActionDef[] = [
     isDisabled: (s) => s.player.actionPoints < 2,
     disabledReason: '行动点不足（需要2点）',
   },
+  {
+    id: 'evening_shift',
+    name: '接便利店晚班',
+    icon: Briefcase,
+    riskPreview: '金钱+16，心情-4',
+    riskDetail: '去便利店或咖啡店接一个晚班。来钱稳定，也可能遇到粉丝、工作人员或他刚好路过。金钱+16，生活稳定度+5，心情-4，压力+7。',
+    isDisabled: (s) => s.player.actionPoints < 1,
+    disabledReason: '行动点不足',
+  },
+  {
+    id: 'translation_gig',
+    name: '接翻译急单',
+    icon: WalletCards,
+    riskPreview: '金钱+22，睡眠-8',
+    riskDetail: '接一个采访字幕、品牌资料或海外粉丝沟通急单。来钱快，但会熬夜，也可能让你更靠近行业信息。金钱+22，压力+8，睡眠-8。',
+    isDisabled: (s) => s.player.actionPoints < 1,
+    disabledReason: '行动点不足',
+  },
+  {
+    id: 'resell_goods',
+    name: '整理周边回血',
+    icon: Ticket,
+    riskPreview: '金钱+12，粉丝怀疑+2',
+    riskDetail: '整理重复专辑、小卡或周边回血。不会太累，但交易记录和同担聊天可能被注意到。金钱+12，粉丝怀疑+2。',
+    isDisabled: (s) => s.player.actionPoints < 1,
+    disabledReason: '行动点不足',
+  },
 ]
 
 interface ActionPanelProps {
@@ -177,6 +204,19 @@ export default function ActionPanel({ isOpen, onClose, onActionSelect }: ActionP
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {state.player.money < 25 && (
+          <div
+            className="mb-3 px-4 py-3 rounded-xl text-xs leading-relaxed"
+            style={{
+              background: 'rgba(234,179,8,0.1)',
+              border: '1px solid rgba(234,179,8,0.2)',
+              color: '#facc15',
+            }}
+          >
+            余额有点危险。可以先接晚班、翻译急单，或者整理周边回血，再去追线下和处理危机。
+          </div>
+        )}
+
         {lastResult && (
           <div
             className="mb-3 px-4 py-3 rounded-xl text-sm"

@@ -122,7 +122,7 @@ export const identityStoryOpenings: IdentityStoryOpening[] = [
     firstMessageZh: '化妆间的事……对不起。',
     firstChoices: [
       { id: 'stylist_1a', text: '没关系，我理解你压力大。', affectionChange: 3, trustChange: 4, description: '感情+3，信任+4，压力-2' },
-      { id: 'stylist_1b', text: '你到底是什么意思？', affectionChange: 5, trustChange: 2, description: '感情+5，信任+2，剧情进入「暧昧拉扯」' },
+      { id: 'stylist_1b', text: '你到底是什么意思？', affectionChange: 5, trustChange: 2, description: '感情+5，信任+2，关系进入「暧昧拉扯」' },
       { id: 'stylist_1c', text: '下次不要再这样了。', affectionChange: -2, trustChange: 6, description: '感情-2，信任+6，他会变得更小心翼翼' },
       { id: 'stylist_1d', text: '……（不回复）', affectionChange: -1, trustChange: 1, description: '第二天他会一直偷偷看你反应' }
     ],

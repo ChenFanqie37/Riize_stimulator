@@ -72,7 +72,7 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
     addNotification({
       id: `story_${event.id}_${Date.now()}`,
       app: 'kakaoTalk',
-      title: `剧情事件：${event.title}`,
+      title: `新的来信：${event.title}`,
       content: event.description,
       urgency: eventType === 'dark' ? 'high' : eventType === 'explosion' ? 'high' : eventType === 'crisis' ? 'medium' : 'low',
       isRead: false,
@@ -117,7 +117,7 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
               type: 'analysis',
               author: 'plot_watcher',
               title: '오늘 흐름이 좀 바뀐 것 같아',
-              content: `剧情事件“${event.title}”之后，粉圈开始把新的选择后果接进时间线。有人说只是巧合，也有人开始等下一张图。`,
+              content: `“${event.title}”之后，粉圈开始把新的选择后果接进时间线。有人说只是巧合，也有人开始等下一张图。`,
               heat: Math.min(100, 38 + current.risk.fanSuspicion + (choice.statChanges.publicHeat || 0)),
               comments: 80 + Math.floor(current.risk.publicHeat * 1.2),
               isPlayerAlt: false,
@@ -130,7 +130,7 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
       addNotification({
         id: `story_after_${Date.now()}`,
         app: 'weverse',
-        title: '剧情后果发酵',
+        title: '余波开始发酵',
         content: '你的选择已经进入粉圈讨论，会在后续事件里继续发酵。',
         urgency: 'medium',
         isRead: false,
@@ -191,14 +191,14 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
         <div className="flex items-center justify-between px-5 py-4 border-b border-purple-900/30">
           <div className="flex items-center gap-3">
             <BookOpen size={20} className="text-purple-400" />
-            <h2 className="text-purple-300 font-bold text-lg">剧情</h2>
+            <h2 className="text-purple-300 font-bold text-lg">手记</h2>
           </div>
           <div className="flex items-center gap-2">
             {onOpenNarrativeMode && (
               <button
                 onClick={onOpenNarrativeMode}
                 className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-                title="进入独立文游模式"
+                title="打开全屏正文"
               >
                 <Maximize2 size={14} className="text-white/70" />
               </button>
@@ -271,7 +271,7 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
                   color: activeTab === tab ? '#c084fc' : 'rgba(255,255,255,0.4)',
                 }}
               >
-                {tab === 'reader' ? '正文' : tab === 'events' ? '事件' : tab === 'progress' ? '进度' : '结局'}
+                {tab === 'reader' ? '正文' : tab === 'events' ? '节点' : tab === 'progress' ? '进度' : '结局'}
               </button>
             ))}
           </div>
@@ -438,7 +438,7 @@ export default function StoryProgression({ isOpen, onClose, onOpenNarrativeMode 
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <p className="text-white/50 text-xs mb-3">剧情历史</p>
+                  <p className="text-white/50 text-xs mb-3">手记历史</p>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {state.history
                       .filter(h => h.memoryTags.some(t => t.startsWith('story_')))

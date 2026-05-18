@@ -215,8 +215,8 @@ const dateTypes: DateTypeConfig[] = [
     risk: 3,
     affectionBonus: 8,
     secrecyImpact: -6,
-    description: '描述你想要的约会，LLM 会实时生成路线、选项和曝光判定',
-    riskLabel: 'AI判定',
+    description: '描述你想要的约会，系统会实时生成路线、选项和曝光判定',
+    riskLabel: '现场判定',
     riskColor: '#a855f7',
   },
 ]
@@ -417,10 +417,10 @@ const tailoredFallbackChoiceTexts: Partial<Record<DateType, Partial<Record<DateS
     departure: ['拍下同一片夜景，不拍人', '擦掉门把手上的口红和指纹', '约好下次带热饮上来，像真的有以后'],
   },
   custom: {
-    arrival_greeting: ['按你写的约会设定先试探现场风险', '让他先选择暗号和碰面点', '故意把主动权交给他，看 AI 怎么判定'],
-    intimate_moment: ['把关键动作留给这次自定义剧情自然生成', '选择更暧昧的推进，但接受更高曝光风险', '收住一点，让后果留到下一天发酵'],
-    unexpected_event: ['根据 AI 给出的危机现场立刻补救', '反其道而行，制造更强的话题钩子', '分头撤离，把线索拆成两段'],
-    departure: ['保存一张符合本次设定的纪念照片', '清掉本次自定义约会的关键痕迹', '把下一次约会写成更大胆的提示词'],
+    arrival_greeting: ['按你写的约会设定先试探现场风险', '让他先选择暗号和碰面点', '故意把主动权交给他，看现场会怎么变'],
+    intimate_moment: ['把关键动作留给这次自定义路线自然生成', '选择更暧昧的推进，但接受更高曝光风险', '收住一点，让后果留到下一天发酵'],
+    unexpected_event: ['根据现场给出的危机立刻补救', '反其道而行，制造更强的话题钩子', '分头撤离，把线索拆成两段'],
+    departure: ['保存一张符合本次设定的纪念照片', '清掉本次自定义约会的关键痕迹', '把下一次约会写成更大胆的暗号'],
   },
 }
 

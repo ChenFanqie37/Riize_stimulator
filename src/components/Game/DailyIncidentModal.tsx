@@ -446,8 +446,8 @@ export default function DailyIncidentModal({ isOpen, onClose, onRequestDate }: D
           <div className="flex items-center gap-2">
             <AlertTriangle size={18} />
             <div>
-              <p className="text-sm font-bold">第 {state.day} 天突发情况</p>
-              <p className="text-[11px] text-white/80">剧情默认推进，每天都会有人先动手。</p>
+              <p className="text-sm font-bold">第 {state.day} 天风向变化</p>
+              <p className="text-[11px] text-white/80">每天都会有人先动手。</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/15">

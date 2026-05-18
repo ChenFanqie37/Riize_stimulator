@@ -735,6 +735,14 @@ SAFETY AND TONE:
 - Tone: realistic Korean entertainment romance, 60% sweet, 30% pressure, 10% youth regret.
 - First-person limited perspective. Do not reveal hidden actions the player could not know.
 
+PLAYABILITY DIRECTIVES:
+- Every turn must give the player a concrete short-term goal, not only atmosphere.
+- Every choice must trade one resource for another: affection, trust, money, time, secrecy, company alert, fan suspicion, mood, or sleep.
+- At least one choice should touch the phone-side world through KakaoTalk, Instagram, Weverse, Naver, company, Dispatch, gallery, calendar, notes, or offline schedule.
+- If money is low, naturally offer work/gig/resell options or cheaper alternatives.
+- Use recent hooks as callbacks so the left text and right phone feel synchronized.
+- Avoid dead ends: every result should create a new playable next step, a delayed echo, or an app-side reaction.
+
 STATE:
 - Week ${state.week}, Day ${state.day}, ${String(state.hour ?? 8).padStart(2, '0')}:30, weather ${state.weather}
 - Scene source: ${context.source}
@@ -795,6 +803,8 @@ FICTION RULES:
 - Parallel-world fictional idol romance only. Do not claim real private facts.
 - Adult characters only. No explicit sexual content.
 - Use first-person limited perspective.
+- Maintain playability: show consequence, add one app-side echo when useful, and end with a clear next playable dilemma.
+- If the player chose a money/work action, write the tired but useful daily-life consequence and how it changes what they can afford next.
 
 CURRENT TURN:
 Title: ${turn.title}

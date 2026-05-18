@@ -320,16 +320,16 @@ export function checkSpecialTriggers(state: GameState): GameEvent | null {
       ]
     }
   }
-  if (player.money < 500) {
+  if (player.money < 25) {
     return {
       id: `special_money_${state.week}`,
       type: 'economy',
       title: '经济危机',
-      description: '你的银行账户余额已经低到危险的程度。如果不能尽快解决经济问题，你可能连留在韩国的资格都没有。',
+      description: '你的余额已经低到会影响行程选择。线下、礼物、交通和临时住宿都要钱，你需要先把生活接住。',
       choices: [
-        { id: 'sp_mon_1', text: '找兼职增加收入', riskPreview: '辛苦但稳定', statChanges: { money: 15, lifeStability: 10, mood: -5, stress: 10 } },
-        { id: 'sp_mon_2', text: '向家里要钱', riskPreview: '安全但增加家人关注', statChanges: { money: 20, lifeStability: 5 } },
-        { id: 'sp_mon_3', text: '省吃俭用', riskPreview: '痛苦但免费', statChanges: { mood: -10, lifeStability: -5, money: 5 } }
+        { id: 'sp_mon_1', text: '接便利店晚班', riskPreview: '辛苦但稳定', statChanges: { money: 16, lifeStability: 5, mood: -4, stress: 7 } },
+        { id: 'sp_mon_2', text: '接翻译/字幕急单', riskPreview: '来钱快但熬夜', statChanges: { money: 22, lifeStability: 3, sleep: -8, stress: 8 } },
+        { id: 'sp_mon_3', text: '整理周边回血', riskPreview: '可能被粉圈熟人看到', statChanges: { money: 12, fanSuspicion: 2, mood: -2 } }
       ]
     }
   }

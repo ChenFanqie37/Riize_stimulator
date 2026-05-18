@@ -209,6 +209,39 @@ export const playerActions: Record<string, PlayerAction> = {
     delayedConsequences: [],
     eventChainTags: [],
   },
+  evening_shift: {
+    id: 'evening_shift',
+    label: '接便利店晚班',
+    description: '去便利店或咖啡店接一段晚班，把线下预算先补回来。',
+    riskPreview: '稳定赚钱，但疲惫会影响状态。',
+    immediateEffect: { money: 16, lifeStability: 5, mood: -4, stress: 7 },
+    visibleTrace: { app: 'calendar', type: 'part_time_shift', canBeDeleted: false, canBeScreenshotted: false },
+    npcReaction: ['bestie', 'boyfriend'],
+    delayedConsequences: [],
+    eventChainTags: ['money_recovery'],
+  },
+  translation_gig: {
+    id: 'translation_gig',
+    label: '接翻译急单',
+    description: '接一个采访字幕、品牌资料或海外粉丝沟通急单。',
+    riskPreview: '来钱快，但熬夜和行业接触会增加疲惫。',
+    immediateEffect: { money: 22, lifeStability: 3, sleep: -8, stress: 8 },
+    visibleTrace: { app: 'notes', type: 'translation_gig', canBeDeleted: false, canBeScreenshotted: false },
+    npcReaction: ['bestie', 'company'],
+    delayedConsequences: [],
+    eventChainTags: ['money_recovery', 'work_trace'],
+  },
+  resell_goods: {
+    id: 'resell_goods',
+    label: '整理周边回血',
+    description: '整理重复专辑、小卡或周边，换一点现金。',
+    riskPreview: '交易记录和同担聊天可能被注意到。',
+    immediateEffect: { money: 12, fanSuspicion: 2, mood: -2 },
+    visibleTrace: { app: 'weverse', type: 'goods_resell', canBeDeleted: true, canBeScreenshotted: true },
+    npcReaction: ['fans', 'bestie'],
+    delayedConsequences: [],
+    eventChainTags: ['money_recovery', 'fan_digging'],
+  },
 }
 
 function applyStatChanges(state: GameState, changes: Record<string, number>): GameState {
@@ -1006,6 +1039,49 @@ function performIdentityAbility(action: PlayerAction, state: GameState): { state
   return { state: refreshStages(s), feedback }
 }
 
+function performMoneyAction(action: PlayerAction, state: GameState): { state: GameState; feedback: string } {
+  let s = applyStatChanges(state, action.immediateEffect)
+  const weekDay = `W${state.week}-D${state.day}`
+  let feedback = action.label
+
+  if (action.id === 'evening_shift') {
+    s = appendCalendar(s, {
+      title: '便利店晚班',
+      date: weekDay,
+      time: '22:00',
+      type: 'player',
+      isHighRisk: false,
+      isCompleted: true,
+    })
+    s = boyfriendMessage(s, '', '别站太久。下班给我发一句，我看得到就回。', 'sweet', 'sweet')
+    feedback = '你接了便利店晚班，钱补回一点。下班时他发来一句很短的提醒。'
+  } else if (action.id === 'translation_gig') {
+    s = appendNote(s, {
+      title: '翻译急单',
+      content: '采访字幕和品牌资料挤在同一个窗口里。你熬夜做完，发现其中一段采访刚好和他的海外行程有关。',
+      type: 'plan',
+    })
+    s = appendNotification(s, 'notes', '急单完成', '钱到账了，但睡眠被偷走一大块。', 'low')
+    feedback = '你接了翻译急单，钱来得快，也更靠近他的行业半径。'
+  } else if (action.id === 'resell_goods') {
+    s = appendWeverse(s, {
+      type: 'control',
+      author: state.appAccounts.weverse.displayName,
+      title: '出几张重复小卡',
+      content: '只走同城面交，不议价。你尽量把账号痕迹藏得很干净。',
+      heat: 18,
+      comments: 12,
+      isPlayerAlt: true,
+      relatedEvidenceIds: [],
+    })
+    s = appendNotification(s, 'weverse', '周边回血中', '同担聊天记录也算一种痕迹，别聊太多私事。', 'low')
+    feedback = '你整理周边回血，钱不多，但足够撑过下一次短线下。'
+  }
+
+  s = appendTrace(s, buildTrace(action, s, feedback))
+  return { state: refreshStages(s), feedback }
+}
+
 function performCrisisStrategy(actionId: string, state: GameState, payload?: any): { state: GameState; feedback: string } {
   const strategy = actionId.replace('crisis_', '')
   let s = state
@@ -1228,6 +1304,7 @@ export function performPlayerAction(
   else if (actionId === 'request_calm' || actionId === 'request_cooling') result = performRequestCalm(action, state)
   else if (actionId === 'demand_public') result = performDemandPublic(action, state)
   else if (actionId === 'use_identity_ability') result = performIdentityAbility(action, state)
+  else if (actionId === 'evening_shift' || actionId === 'translation_gig' || actionId === 'resell_goods') result = performMoneyAction(action, state)
   else {
     let updatedState = applyStatChanges(state, action.immediateEffect)
     const trace = buildTrace(action, updatedState)

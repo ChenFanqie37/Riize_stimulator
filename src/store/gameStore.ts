@@ -172,7 +172,7 @@ function buildAppAccounts(playerName = '你', identity: PlayerIdentity = 'studen
       persona: '秘密计划本',
       accountType: 'private',
       followers: 0,
-      riskNote: '剧情线索和自救计划都会写在这里。',
+      riskNote: '秘密线索和自救计划都会写在这里。',
       isAnonymous: false,
     },
     health: {
@@ -713,7 +713,7 @@ function materializeStoryEventPreview(state: GameState, event: GameEvent | null)
         id: uid('hist_event'),
         week: state.week,
         day: state.day,
-        event: '剧情事件',
+        event: '正文节点',
         choice: event.title,
         consequences: {},
         memoryTags: [event.type, `chapter_${event.chapter || state.currentChapter}`],
@@ -955,7 +955,7 @@ const initialState: GameState = {
     fanLevel: 'casual',
     storyPace: 'standard',
     plotPreference: 'A',
-    money: 35,
+    money: 80,
     mood: 60,
     popularity: 10,
     lifeStability: 50,
@@ -1138,15 +1138,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const boyfriendName = options.customBoyfriendName || memberData.nameZh
     const persona = getRandomPersona(options.memberId)
     const identityData = {
-      student: { money: 30, mood: 60, popularity: 10, lifeStability: 50 },
-      fan: { money: 40, mood: 70, popularity: 20, lifeStability: 40 },
-      intern: { money: 35, mood: 50, popularity: 15, lifeStability: 55 },
-      staff: { money: 45, mood: 55, popularity: 15, lifeStability: 60 },
-      stylist: { money: 40, mood: 55, popularity: 20, lifeStability: 50 },
-      translator: { money: 55, mood: 50, popularity: 15, lifeStability: 65 },
-      volunteer: { money: 25, mood: 65, popularity: 5, lifeStability: 55 },
-      parttime: { money: 20, mood: 45, popularity: 10, lifeStability: 35 },
-      custom: { money: 35, mood: 55, popularity: 10, lifeStability: 45 }
+      student: { money: 78, mood: 60, popularity: 10, lifeStability: 50 },
+      fan: { money: 82, mood: 70, popularity: 20, lifeStability: 40 },
+      intern: { money: 76, mood: 50, popularity: 15, lifeStability: 55 },
+      staff: { money: 84, mood: 55, popularity: 15, lifeStability: 60 },
+      stylist: { money: 80, mood: 55, popularity: 20, lifeStability: 50 },
+      translator: { money: 90, mood: 50, popularity: 15, lifeStability: 65 },
+      volunteer: { money: 72, mood: 65, popularity: 5, lifeStability: 55 },
+      parttime: { money: 68, mood: 45, popularity: 10, lifeStability: 35 },
+      custom: { money: 80, mood: 55, popularity: 10, lifeStability: 45 }
     }
     const stats = identityData[options.identity]
     const storyOpening = getIdentityStory(options.identity)
@@ -2134,6 +2134,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const relationshipRaised = Boolean(choice && ((choice.statChanges.affection || 0) > 0 || (choice.statChanges.trust || 0) > 0))
     const historyChoice = choiceId === 'D' && freeInput ? freeInput : choice?.text || `选项 ${choiceId}`
     const createdAt = Date.now()
+    const appEcho = nextTurn.bodyLines[0] || nextTurn.title
 
     set({
       activeNarrativeTurn: nextTurn,
@@ -2143,12 +2144,65 @@ export const useGameStore = create<GameStore>((set, get) => ({
         nextTurn,
       ].slice(-40),
       pendingStoryHooks: state.pendingStoryHooks.slice(-8),
+      ...(riskRaised
+        ? {
+            weverse: {
+              ...state.weverse,
+              posts: [
+                ...state.weverse.posts,
+                {
+                  id: uid('wv_narrative'),
+                  type: 'analysis' as const,
+                  author: 'timeline_room',
+                  title: '방금 흐름 바뀐 거 봤어?',
+                  content: appEcho,
+                  heat: Math.min(100, 32 + state.risk.fanSuspicion + state.risk.publicHeat),
+                  comments: 40 + Math.floor(state.risk.fanSuspicion * 1.5),
+                  isPlayerAlt: false,
+                  relatedEvidenceIds: state.evidenceFragments.slice(-3).map((item) => item.id),
+                  createdAt,
+                },
+              ],
+            },
+          }
+        : {}),
+      ...(relationshipRaised
+        ? {
+            kakaoTalk: {
+              ...state.kakaoTalk,
+              threads: state.kakaoTalk.threads.map((thread) =>
+                thread.id === 'thread_boyfriend'
+                  ? {
+                      ...thread,
+                      unreadCount: thread.unreadCount + 1,
+                      lastActive: '刚刚',
+                      messages: [
+                        ...thread.messages,
+                        {
+                          id: uid('msg_narrative'),
+                          sender: 'boyfriend' as const,
+                          senderName: state.maleLead.name,
+                          textKo: '',
+                          textZh: appEcho.length > 80 ? `${appEcho.slice(0, 78)}…` : appEcho,
+                          timestamp: createdAt,
+                          isRead: false,
+                          isRecalled: false,
+                          emotion: 'sweet' as const,
+                          category: 'sweet' as const,
+                        },
+                      ],
+                    }
+                  : thread
+              ),
+            },
+          }
+        : {}),
       notifications: [
         ...state.notifications,
         {
           id: uid('notif_narrative'),
           app: riskRaised ? 'weverse' : relationshipRaised ? 'kakaoTalk' : 'notes',
-          title: riskRaised ? '剧情后果开始发酵' : relationshipRaised ? '关系推进' : '剧情已推进',
+          title: riskRaised ? '余波开始发酵' : relationshipRaised ? '关系推进' : '正文已推进',
           content: nextTurn.bodyLines[0] || nextTurn.title,
           urgency: riskRaised ? 'medium' : 'low',
           isRead: false,
@@ -2161,7 +2215,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           id: uid('hist_narrative'),
           week: state.week,
           day: state.day,
-          event: turn?.title || '剧情推进',
+          event: turn?.title || '正文推进',
           choice: historyChoice,
           consequences: choice?.statChanges || {},
           memoryTags: ['narrative_choice', `choice_${choiceId}`, ...nextTurn.memoryTags],

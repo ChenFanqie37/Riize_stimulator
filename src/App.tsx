@@ -33,6 +33,7 @@ import Health from '@/components/Apps/Health'
 import StoryProgression from '@/components/Game/StoryProgression'
 import DailyIncidentModal from '@/components/Game/DailyIncidentModal'
 import NarrativeMode from '@/components/Game/NarrativeMode'
+import NarrativeReader from '@/components/Game/NarrativeReader'
 import { BarChart3, Zap, FastForward, FolderOpen, Settings, Bell, BookOpen, Heart, SkipForward, Key, ScrollText } from 'lucide-react'
 import { useSettingsStore } from '@/store/settingsStore'
 
@@ -130,7 +131,7 @@ function GameScreen() {
   const [saveLoadOpen, setSaveLoadOpen] = useState(false)
   const [dateSystemOpen, setDateSystemOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [storyProgressionOpen, setStoryProgressionOpen] = useState(true)
+  const [storyProgressionOpen, setStoryProgressionOpen] = useState(false)
   const [narrativeModeOpen, setNarrativeModeOpen] = useState(false)
   const [relationshipGuideOpen, setRelationshipGuideOpen] = useState(false)
   const [daysSinceLastDate, setDaysSinceLastDate] = useState(0)
@@ -155,6 +156,10 @@ function GameScreen() {
 
   useEffect(() => {
     const key = `${state.week}-${state.day}`
+    if (state.week === 1 && state.day === 1) {
+      if (key !== lastIncidentKey) setLastIncidentKey(key)
+      return
+    }
     if (key !== lastIncidentKey) {
       setLastIncidentKey(key)
       setDailyIncidentOpen(true)
@@ -219,18 +224,26 @@ function GameScreen() {
       className="fixed inset-0 flex flex-col items-center justify-center"
       style={{ background: '#F2F2F7' }}
     >
-      <div className="flex items-center gap-4">
-        <PhoneFrame>
-          <div className="relative h-full">
-            <MessageBanner />
-            {renderCurrentApp()}
-            <NotificationPanel
-              isOpen={notificationsOpen}
-              onClose={() => setNotificationsOpen(false)}
-            />
-            <IncomingCallUI />
-          </div>
-        </PhoneFrame>
+      <div className="flex-1 w-full flex items-center justify-center gap-5 px-4 pt-4 pb-20 overflow-hidden">
+        <div
+          className="hidden lg:block relative h-full max-h-[calc(100vh-112px)] w-[min(54vw,760px)] rounded-[28px] overflow-hidden bg-white border border-black/10 shadow-xl"
+        >
+          <NarrativeReader source="narrative_mode" compact />
+        </div>
+
+        <div className="shrink-0">
+          <PhoneFrame>
+            <div className="relative h-full">
+              <MessageBanner />
+              {renderCurrentApp()}
+              <NotificationPanel
+                isOpen={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+              />
+              <IncomingCallUI />
+            </div>
+          </PhoneFrame>
+        </div>
       </div>
 
       <div
@@ -324,7 +337,7 @@ function GameScreen() {
           }}
         >
           <BookOpen size={14} />
-          剧情
+          正文
         </button>
 
         <button
@@ -340,7 +353,7 @@ function GameScreen() {
           }}
         >
           <ScrollText size={14} />
-          文游
+          全屏
         </button>
 
         <button
@@ -437,8 +450,8 @@ function GameScreen() {
                 <Key size={20} style={{ color: '#f59e0b' }} />
               </div>
               <div>
-                <h3 className="text-[#1C1C1E] font-bold text-sm">配置 API 密钥</h3>
-                <p className="text-[#8E8E93] text-[10px]">AI聊天功能需要API密钥才能运行</p>
+                <h3 className="text-[#1C1C1E] font-bold text-sm">配置续写密钥</h3>
+                <p className="text-[#8E8E93] text-[10px]">来信和正文续写需要密钥才能运行</p>
               </div>
             </div>
 
@@ -450,7 +463,7 @@ function GameScreen() {
                   color: 'rgba(28,28,30,0.7)',
               }}
             >
-              <p className="mb-2">🔑 本游戏使用 DeepSeek AI 驱动聊天功能</p>
+              <p className="mb-2">🔑 续写和来信功能需要连接 DeepSeek</p>
               <p className="mb-2">📱 获取密钥步骤：</p>
               <ol className="list-decimal list-inside space-y-1 text-[#8E8E93]">
                 <li>访问 <span className="text-amber-400">platform.deepseek.com</span></li>

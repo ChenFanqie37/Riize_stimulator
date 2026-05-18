@@ -4,7 +4,7 @@ import { useGameStore } from '@/store/gameStore'
 import AppAccountBar from '../../Common/AppAccountBar'
 import { generateOfflineScene } from '@/engine/gemini'
 import { createFallbackOfflineScene } from '@/engine/narrativeEngine'
-import type { OfflineAccessMode, OfflineAccessModeId, OfflineCategory, OfflinePlan, OfflineSceneResult } from '@/types/game'
+import type { NarrativeTurn, OfflineAccessMode, OfflineAccessModeId, OfflineCategory, OfflinePlan, OfflineSceneResult } from '@/types/game'
 
 const categoryLabels: Record<OfflineCategory, string> = {
   concert: '演唱会',
@@ -184,7 +184,7 @@ const basePlans: OfflinePlan[] = [
     minTrust: 38,
     risk: 78,
     reward: 84,
-    detail: '最像恋爱剧情，也最危险。员工、私生、狗仔都可能认识这条路。',
+    detail: '最像秘密恋爱，也最危险。员工、私生、狗仔都可能认识这条路。',
     accessModes: [
       access({ id: 'self_paid', label: '自己去咖啡厅等', description: '像普通客人一样坐着，风险来自熟脸。', cost: 10, riskDelta: 0, rewardDelta: 0 }),
       access({ id: 'boyfriend_arranged', label: '他让你坐固定角落', description: '店员会记住你们的习惯，甜但很容易形成证据。', cost: 5, riskDelta: 14, rewardDelta: 12, minAffection: 42, minTrust: 38, companyAlertDelta: 8 }),
@@ -228,7 +228,7 @@ const basePlans: OfflinePlan[] = [
     minTrust: 28,
     risk: 34,
     reward: 50,
-    detail: '青春感最强，费用低；如果他特意给你留通道，反而更像剧情会被记住。',
+    detail: '青春感最强，费用低；如果他特意给你留通道，反而更像会被人记住的偏爱。',
     accessModes: [
       access({ id: 'self_paid', label: '作为观众参加', description: '自然、便宜，但距离远。', cost: 6, riskDelta: 0, rewardDelta: 0 }),
       access({ id: 'boyfriend_arranged', label: '他让志愿者给你留前排边座', description: '像小小偏爱，风险温和。', cost: 0, riskDelta: 8, rewardDelta: 10, minAffection: 30, minTrust: 28, companyAlertDelta: 2 }),
@@ -301,6 +301,49 @@ export default function Offline() {
       actionPoints: -1,
     }
     updateStats(combinedStats)
+
+    const followUpChoices: NarrativeTurn['choices'] = [
+      {
+        id: 'A',
+        text: '把现场留下的东西收好，不再多发任何动态。',
+        riskPreview: '保密度+2，心情-1',
+        statChanges: { secrecy: 2, mood: -1 },
+        timeCost: 1,
+      },
+      {
+        id: 'B',
+        text: '回他一句“我看见你了”，只说给他听。',
+        riskPreview: '好感+2，信任+1',
+        statChanges: { affection: 2, trust: 1 },
+        timeCost: 1,
+      },
+      {
+        id: 'C',
+        text: '去刷现场讨论，看有没有人注意到你的动线。',
+        riskPreview: '粉丝怀疑+3，压力+2',
+        statChanges: { fanSuspicion: 3, stress: 2 },
+        timeCost: 2,
+      },
+      {
+        id: 'D',
+        text: '自由行动：由你输入。',
+        riskPreview: '根据输入结算',
+        statChanges: {},
+        timeCost: 2,
+        freeInput: true,
+      },
+    ]
+    const offlineTurn: NarrativeTurn = {
+      id: `nar_offline_${now}`,
+      title: plan.title,
+      scene: `${plan.place} · ${mode.label}`,
+      bodyLines: scene.narrative,
+      choices: followUpChoices,
+      status: 'active',
+      createdAt: now,
+      memoryTags: scene.historyTags,
+      source: 'offline',
+    }
 
     useGameStore.setState((current) => {
       const message = {
@@ -429,6 +472,8 @@ export default function Offline() {
             createdAt: now,
           },
         ],
+        activeNarrativeTurn: offlineTurn,
+        narrativeLog: [...current.narrativeLog, offlineTurn].slice(-40),
       }
     })
 
@@ -474,6 +519,14 @@ export default function Offline() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {state.player.money < 25 && (
+          <div className="mx-3 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="text-[11px] leading-relaxed text-amber-700">
+              余额不太够追高价线下。可以先去“行动”里接便利店晚班、翻译急单，或者整理周边回血。
+            </p>
+          </div>
+        )}
+
         {plans.map((plan) => {
           const Icon = categoryIcons[plan.category]
           const arranged = plan.accessModes.find((mode) => mode.id === 'boyfriend_arranged')

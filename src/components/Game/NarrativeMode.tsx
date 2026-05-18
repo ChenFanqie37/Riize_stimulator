@@ -15,7 +15,7 @@ export default function NarrativeMode({ isOpen, onClose }: NarrativeModeProps) {
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/5 flex items-center justify-center text-gray-500 hover:bg-black/10"
-          title="关闭文游模式"
+          title="关闭全屏正文"
         >
           <X size={18} />
         </button>

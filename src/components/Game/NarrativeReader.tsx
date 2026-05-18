@@ -88,8 +88,8 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
       <div className="px-5 py-4 border-b border-black/5 bg-white/95 sticky top-0 z-10">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] text-[#8E8E93]">韩娱嫂子模拟器游戏启动</p>
-            <h2 className="text-base font-bold tracking-normal">剧情正文</h2>
+            <p className="text-[11px] text-[#8E8E93]">首尔地下恋爱手记</p>
+            <h2 className="text-base font-bold tracking-normal">今日正文</h2>
           </div>
           <button
             onClick={startTurn}
@@ -97,7 +97,7 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
             className="h-9 px-3 rounded-full bg-blue-50 text-blue-600 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            生成剧情
+            续写
           </button>
         </div>
       </div>
@@ -161,7 +161,7 @@ export default function NarrativeReader({ source = 'narrative_mode', compact = f
         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center">
           <div className="rounded-full bg-white shadow-lg px-4 py-2 text-xs text-blue-600 flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
-            AI 正在润色剧情...
+            正在续写这一段...
           </div>
         </div>
       )}
