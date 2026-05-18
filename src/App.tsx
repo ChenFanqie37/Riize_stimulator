@@ -30,6 +30,7 @@ import Gallery from '@/components/Apps/Gallery'
 import Notes from '@/components/Apps/Notes'
 import Health from '@/components/Apps/Health'
 import StoryProgression from '@/components/Game/StoryProgression'
+import DailyIncidentModal from '@/components/Game/DailyIncidentModal'
 import { BarChart3, Zap, FastForward, FolderOpen, Settings, Bell, BookOpen, Heart, SkipForward, Key, AlertCircle } from 'lucide-react'
 import { useSettingsStore } from '@/store/settingsStore'
 
@@ -127,9 +128,11 @@ function GameScreen() {
   const [saveLoadOpen, setSaveLoadOpen] = useState(false)
   const [dateSystemOpen, setDateSystemOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [storyProgressionOpen, setStoryProgressionOpen] = useState(false)
+  const [storyProgressionOpen, setStoryProgressionOpen] = useState(true)
   const [relationshipGuideOpen, setRelationshipGuideOpen] = useState(false)
   const [daysSinceLastDate, setDaysSinceLastDate] = useState(0)
+  const [dailyIncidentOpen, setDailyIncidentOpen] = useState(false)
+  const [lastIncidentKey, setLastIncidentKey] = useState('')
   const hasApiKey = useSettingsStore((s) => s.hasApiKey)
   const [showApiKeyGuide, setShowApiKeyGuide] = useState(false)
 
@@ -146,6 +149,14 @@ function GameScreen() {
       setShowCrisis(true)
     }
   }, [crisisLevel])
+
+  useEffect(() => {
+    const key = `${state.week}-${state.day}`
+    if (key !== lastIncidentKey) {
+      setLastIncidentKey(key)
+      setDailyIncidentOpen(true)
+    }
+  }, [state.week, state.day, lastIncidentKey])
 
   const closeAllPanels = () => {
     setStatsOpen(false)
@@ -366,6 +377,16 @@ function GameScreen() {
       <SaveLoadPanel isOpen={saveLoadOpen} onClose={() => setSaveLoadOpen(false)} />
       <DateSystem isOpen={dateSystemOpen} onClose={() => setDateSystemOpen(false)} />
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <StoryProgression isOpen={storyProgressionOpen} onClose={() => setStoryProgressionOpen(false)} />
+      <DailyIncidentModal
+        isOpen={dailyIncidentOpen}
+        onClose={() => setDailyIncidentOpen(false)}
+        onRequestDate={() => {
+          closeAllPanels()
+          setDateSystemOpen(true)
+          setDaysSinceLastDate(0)
+        }}
+      />
       <ModalQueue />
 
       {showApiKeyGuide && (

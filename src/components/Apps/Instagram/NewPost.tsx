@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, MapPin, AlertTriangle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, MapPin, AlertTriangle, Image as ImageIcon } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { createClueFromPost, calculatePostRisk } from '@/engine/clueEngine'
 import type { PostType, Visibility, InstagramPost } from '@/types/game'
@@ -35,7 +35,6 @@ function getRiskBg(risk: number) {
 
 export default function NewPost({ onClose }: { onClose: () => void }) {
   const postInstagram = useGameStore((s) => s.postInstagram)
-  const performAction = useGameStore((s) => s.performAction)
   const updateStats = useGameStore((s) => s.updateStats)
   const addNotification = useGameStore((s) => s.addNotification)
   const player = useGameStore((s) => s.player)
@@ -45,12 +44,26 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const updateHiddenRisk = useGameStore((s) => s.updateHiddenRisk)
   const day = useGameStore((s) => s.day)
   const week = useGameStore((s) => s.week)
+  const galleryPhotos = useGameStore((s) => s.gallery.photos)
+  const pendingDraft = useGameStore((s) => s.pendingInstagramDraft)
 
-  const [postType, setPostType] = useState<PostType>('post')
-  const [category, setCategory] = useState<string>('normal')
-  const [caption, setCaption] = useState('')
-  const [visibility, setVisibility] = useState<Visibility>('public')
-  const [showLocation, setShowLocation] = useState(false)
+  const [postType, setPostType] = useState<PostType>(pendingDraft?.postType || 'post')
+  const [category, setCategory] = useState<string>(pendingDraft?.category || 'normal')
+  const [caption, setCaption] = useState(pendingDraft?.caption || '')
+  const [visibility, setVisibility] = useState<Visibility>(pendingDraft?.visibility || 'public')
+  const [showLocation, setShowLocation] = useState(pendingDraft?.showLocation || false)
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | undefined>(pendingDraft?.sourcePhotoId)
+
+  useEffect(() => {
+    if (!pendingDraft) return
+    setPostType(pendingDraft.postType)
+    setCategory(pendingDraft.category)
+    setCaption(pendingDraft.caption)
+    setVisibility(pendingDraft.visibility)
+    setShowLocation(pendingDraft.showLocation)
+    setSelectedPhotoId(pendingDraft.sourcePhotoId)
+    useGameStore.setState({ pendingInstagramDraft: null })
+  }, [pendingDraft])
 
   const selectedCategory = categories.find((c) => c.id === category)!
   const visibilityOption = visibilityOptions.find((v) => v.id === visibility)!
@@ -59,13 +72,18 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
   const totalRisk = Math.max(0, Math.min(100, baseRisk + riskMod + (risk.fanSuspicion > 50 ? 10 : 0)))
 
   const handlePost = () => {
-    if (postType === 'story') {
-      performAction('post_instagram_story', { caption, visibility, template: category, showLocation })
-      onClose()
-      return
-    }
-
-    const imageTags = category === 'normal' ? ['selfie'] : category === 'ambiguous' ? ['couple', 'mood'] : category === 'emotional' ? ['mood', 'night'] : category === 'provocative' ? ['night', 'selfie'] : ['cafe', 'food']
+    const selectedPhoto = galleryPhotos.find((photo) => photo.id === selectedPhotoId)
+    const imageTags = selectedPhoto
+      ? [selectedPhoto.source, selectedPhoto.riskLevel === 'high' ? 'couple' : 'mood']
+      : category === 'normal'
+        ? ['selfie']
+        : category === 'ambiguous'
+          ? ['couple', 'mood']
+          : category === 'emotional'
+            ? ['mood', 'night']
+            : category === 'provocative'
+              ? ['night', 'selfie']
+              : ['cafe', 'food']
     const { riskScore, hiddenRiskChanges } = calculatePostRisk(caption, imageTags, visibility, hiddenRisk)
     const post: InstagramPost = {
       id: `ig_${Date.now()}`,
@@ -85,7 +103,7 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
       screenshottedBy: [],
       boyfriendViewed: false,
       createdAt: Date.now(),
-      expiresAt: undefined,
+      expiresAt: postType === 'story' ? Date.now() + 24 * 60 * 60 * 1000 : undefined,
     }
     postInstagram(post)
     const clues = createClueFromPost(caption, imageTags, 'instagram', day, week, visibility)
@@ -178,6 +196,43 @@ export default function NewPost({ onClose }: { onClose: () => void }) {
               Story
             </button>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-[#3C3C3C] mb-2">从相册选照片</p>
+          {galleryPhotos.filter((photo) => !photo.isDeleted).length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {galleryPhotos
+                .filter((photo) => !photo.isDeleted)
+                .slice(-8)
+                .reverse()
+                .map((photo) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setSelectedPhotoId(selectedPhotoId === photo.id ? undefined : photo.id)}
+                    className={`shrink-0 w-24 rounded-lg border p-2 text-left transition-all ${
+                      selectedPhotoId === photo.id
+                        ? 'border-pink-400 bg-pink-50'
+                        : 'border-gray-100 bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-full aspect-square rounded-md bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center mb-1.5">
+                      <ImageIcon size={18} className="text-white" />
+                    </div>
+                    <p className="text-[10px] font-semibold text-[#3C3C3C] truncate">{photo.title}</p>
+                    <p className={`text-[9px] mt-0.5 ${
+                      photo.riskLevel === 'high' ? 'text-red-500' : photo.riskLevel === 'medium' ? 'text-orange-500' : 'text-green-500'
+                    }`}>
+                      {photo.riskLevel === 'high' ? '高危照片' : photo.riskLevel === 'medium' ? '暧昧痕迹' : '低风险'}
+                    </p>
+                  </button>
+                ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-3 text-[11px] text-gray-400">
+              相册还没有可用照片。约会后保存照片，就可以在这里选。
+            </div>
+          )}
         </div>
 
         <div className="mb-4">

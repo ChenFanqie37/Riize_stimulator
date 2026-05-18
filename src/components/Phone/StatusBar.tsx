@@ -1,19 +1,35 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Battery, Signal, Wifi, Clock } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { TimeOfDay } from '@/types/game'
 
-const timeMap: Record<TimeOfDay, string> = {
-  morning: '08:30',
-  afternoon: '14:00',
-  evening: '19:30',
-  night: '23:45',
+const baseMinutes: Record<TimeOfDay, number> = {
+  morning: 8 * 60 + 30,
+  afternoon: 14 * 60,
+  evening: 19 * 60 + 30,
+  night: 23 * 60 + 45,
 }
 
 export default function StatusBar() {
   const timeOfDay = useGameStore((s) => s.timeOfDay)
   const week = useGameStore((s) => s.week)
+  const day = useGameStore((s) => s.day)
+  const [minuteOffset, setMinuteOffset] = useState(0)
 
-  const time = timeMap[timeOfDay]
+  useEffect(() => {
+    setMinuteOffset(0)
+    const timer = window.setInterval(() => {
+      setMinuteOffset((value) => (value + 10) % 240)
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [timeOfDay, week, day])
+
+  const time = useMemo(() => {
+    const total = (baseMinutes[timeOfDay] + minuteOffset) % (24 * 60)
+    const hours = Math.floor(total / 60).toString().padStart(2, '0')
+    const minutes = (total % 60).toString().padStart(2, '0')
+    return `${hours}:${minutes}`
+  }, [timeOfDay, minuteOffset])
   const batteryLevel = Math.max(10, 100 - (week - 1) * 2)
 
   const batteryColor =

@@ -94,6 +94,13 @@ export default function ChatRoom() {
           `[${c.clueType}] ${c.description} (severity:${c.severity})`
         )
         const hiddenRiskSummary = `Lovestagram:${hiddenRisk.lovestagramScore} CoupleItem:${hiddenRisk.coupleItemScore} Timeline:${hiddenRisk.timelineOverlap} Paparazzi:${hiddenRisk.paparazziHeat} Possessiveness:${hiddenRisk.possessiveness}`
+        const riskTalkPattern = /被发现|曝光|粉丝|公司|狗仔|私生|热搜|截图|小心|危险|删掉|撤回|动线|Dispatch|D社/
+        const riskMentionsRecently = thread.messages
+          .slice(-6)
+          .filter((m) => m.sender === 'boyfriend' && riskTalkPattern.test(m.textZh))
+          .length
+        const playerAskedAboutRisk = riskTalkPattern.test(text)
+        const visibleRecentClues = riskMentionsRecently >= 2 && !playerAskedAboutRisk ? [] : recentClues
         const context = {
           boyfriendName: maleLead.name,
           boyfriendPersona: maleLead.hiddenPersona,
@@ -115,10 +122,12 @@ export default function ChatRoom() {
           recentEvents: maleLead.memory.unresolvedIssues,
           mentalTags: player.mentalTags,
           relationshipStatus,
-          recentClues,
+          recentClues: visibleRecentClues,
           hiddenRiskSummary,
           fandomStage,
           paparazziStage,
+          riskMentionsRecently,
+          playerAskedAboutRisk,
         }
         const reply = await generateChatReply(context)
         const replyMsg: ChatMessage = {

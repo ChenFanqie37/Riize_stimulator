@@ -122,12 +122,12 @@ const dateTypes: DateTypeConfig[] = [
   },
   {
     id: 'hotel',
-    name: '酒店黑屏夜',
+    name: '酒店门后夜',
     icon: '🏨',
     risk: 6,
     affectionBonus: 18,
     secrecyImpact: -14,
-    description: '门在身后合上，画面黑屏；第二天只剩未接来电和香水味',
+    description: '门在身后合上，镜头停在门外；第二天只剩未接来电和香水味',
     riskLabel: '爆炸风险',
     riskColor: '#dc2626',
   },
@@ -284,7 +284,7 @@ const fallbackDateProfiles: Partial<Record<DateType, {
     hook: '电梯数字一层层往上跳，你们谁都没有说话，只有房卡在他指尖轻轻响。',
     arrivalKo: '오늘은 아무도 모르게 있어줘.',
     arrivalZh: '今晚就谁也别知道，只陪我待一会儿。',
-    intimate: '门在身后合上，镜头停在凌乱的外套和亮着的手机屏幕上；之后的部分只剩黑屏和第二天的后果。',
+    intimate: '门在身后合上，镜头停在凌乱的外套和亮着的手机屏幕上；之后的部分只留在门后的第二天。',
     danger: '楼下大厅出现了熟悉的站姐镜头，房间服务记录也会留下时间。',
     goodbyeKo: '아침에 먼저 나갈게. 너는 천천히 나와.',
     goodbyeZh: '早上我先走。你慢一点出来。',
@@ -361,6 +361,78 @@ const fallbackDateProfiles: Partial<Record<DateType, {
   },
 }
 
+const tailoredFallbackChoiceTexts: Partial<Record<DateType, Partial<Record<DateScene['type'], string[]>>>> = {
+  backdoor: {
+    arrival_greeting: ['先贴着墙听脚步声，再把他拉进监控死角', '把工作人员证件翻到背面，装作只是路过', '低声笑他胆子大，连门禁声都不怕'],
+    intimate_moment: ['摸掉他额角的汗，问他刚才是不是一直在找你', '把手机扣进外套口袋，专心听他喘匀呼吸', '隔着练习服牵一下手，提醒他五分钟后必须回去'],
+    unexpected_event: ['立刻把门缝留开，装成工作人员交接', '不退，反而替他整理衣领赌没人敢进来', '从安全通道分开，十分钟后用暗号报平安'],
+    departure: ['拍下门禁灯的反光，只存进隐藏相册', '互删后台定位和通行记录截图', '约好下次换一个更靠近舞台的死角'],
+  },
+  hotel: {
+    arrival_greeting: ['在电梯里隔半步站着，只让袖口碰到他', '接过房卡却不看楼层，等他先按按钮', '故意问他现在后悔还来不来得及'],
+    intimate_moment: ['把窗帘拉严，让城市灯光只剩一条缝', '把手机扣下，把今晚留在门后', '替他摘掉帽子，再提醒明早分开离开'],
+    unexpected_event: ['让客房服务先走，等走廊安静再开门', '把灯调暗，赌大厅那台镜头拍不到楼层', '你先进浴室躲开，他去应付门外声音'],
+    departure: ['留一张香水瓶旁的照片，只发给自己小号', '分批退房，删除叫车记录', '约定明天谁都不主动，但谁都别真的忍住'],
+  },
+  airport: {
+    arrival_greeting: ['在登机牌背后写一句暗号递给他', '替他压低帽檐，装作只是粉丝擦肩', '隔着人群对视三秒，谁先笑谁输'],
+    intimate_moment: ['把他的帽子扣到自己头上，再立刻还回去', '在免税店货架后短暂牵手', '替他检查口罩边缘，顺手碰一下耳侧'],
+    unexpected_event: ['混进排队人群，让行李箱挡住半边身影', '继续并肩走，赌长焦只拍到背影', '一个去洗手间，一个去登机口，十分钟后汇合'],
+    departure: ['拍下同一班航班屏幕，藏进相册', '删掉机场 Wi-Fi 记录和定位', '约好落地后用一个表情当平安暗号'],
+  },
+  studio: {
+    arrival_greeting: ['戴上他递来的耳机，先听那句未公开旋律', '把外卖袋放到桌下，假装只是工作人员送餐', '问他歌词里那句是不是写给你'],
+    intimate_moment: ['隔着一副耳机听同一段副歌', '让他在收音灯熄灭后才靠近', '把歌词纸反扣，避免你的名字被拍到'],
+    unexpected_event: ['立刻按下静音键，装成录音事故', '把外卖袋挡到镜头前，继续听他说完', '你躲进控制室，他去开门拿文件'],
+    departure: ['拍一张混音台灯光，不露任何人', '撕掉写着日期的歌词草稿', '约好歌曲公开那天再提今晚'],
+  },
+  home: {
+    arrival_greeting: ['先确认窗帘拉严，再让他进门', '把拖鞋踢给他，假装这不是第一次', '站在玄关不动，等他先抱上来'],
+    intimate_moment: ['把两部手机都扣在茶几上，让世界暂时失联', '关掉客厅大灯，只留冰箱的光', '替他把外套挂好，再提醒外卖别写真名'],
+    unexpected_event: ['让快递放门口，等脚步声远了再取', '拉他躲到玄关阴影里，赌邻居没看清', '你去阳台，他坐回沙发装成独处'],
+    departure: ['拍下他喝过的杯子，藏进隐藏相册', '清掉外卖地址和门禁访客记录', '约好下次直接买双专属拖鞋'],
+  },
+  brandparty: {
+    arrival_greeting: ['隔着香槟塔对视，不让镜头抓到同框', '假装看展品，从他身后错身而过', '把胸针方向调成你们约好的暗号'],
+    intimate_moment: ['在媒体墙拐角停三秒，谁也不先伸手', '替他挡住闪光灯，像只是礼貌经过', '用杯沿碰一下他的杯沿，马上分开'],
+    unexpected_event: ['立刻加入别人合照，把同框切散', '不躲，反而让他和女艺人说话做烟雾弹', '从工作人员通道分头离场'],
+    departure: ['拍一张只露香槟杯的照片，文案写得很暧昧', '删掉邀请函二维码和座位图', '约好散场后打电话，谁也别在现场回头'],
+  },
+  convenience: {
+    arrival_greeting: ['拿走最后一盒草莓牛奶，等他开口抢', '站在泡面架前装偶遇', '让收银小票挡住你们同时伸出的手'],
+    intimate_moment: ['用外套挡住两个人交叠的手', '分一口热泡面，笑他被烫到还装没事', '把同款饮料转到背面，别让标签入镜'],
+    unexpected_event: ['低头假装各自刷手机，让 CCTV 只拍到侧脸', '继续站一起，赌凌晨没人认真看监控', '你先出门，他绕到后巷再走'],
+    departure: ['拍下同一张小票但裁掉时间', '把包装袋分开扔进不同垃圾桶', '约好下次升级成深夜车里吃拉面'],
+  },
+  musicshow: {
+    arrival_greeting: ['在待机室门口只点一下头，像完全不熟', '把应援贴纸藏进袖口给他看一眼', '趁工作人员转身，把水递到他手边'],
+    intimate_moment: ['隔着未开封的水瓶碰到指尖', '在走廊尽头听他小声哼今天的安可', '替他擦掉妆边亮片，马上退开'],
+    unexpected_event: ['立刻混进工作人员队列，拿文件夹挡脸', '继续从他身边擦过，赌站姐只顾拍正脸', '他回待机室，你绕去舞台侧门'],
+    departure: ['保存一张舞台侧影，只露灯牌颜色', '删掉后台通行证照片', '约好下次在彩排前多偷三分钟'],
+  },
+  rooftop: {
+    arrival_greeting: ['先锁好天台门，再走向灯影外的他', '把帽衫帽子扣到他头上，笑他像逃课', '站在风口不动，等他把你拉过去'],
+    intimate_moment: ['把手塞进他袖口里取暖', '让城市灯光替你们遮住表情', '靠在水箱后面，提醒他别笑太大声'],
+    unexpected_event: ['躲到楼梯间，等成员的笑声下去', '继续站在栏杆边，赌楼下车里没人架镜头', '你先下两层，他从另一侧电梯离开'],
+    departure: ['拍下同一片夜景，不拍人', '擦掉门把手上的口红和指纹', '约好下次带热饮上来，像真的有以后'],
+  },
+  custom: {
+    arrival_greeting: ['按你写的约会设定先试探现场风险', '让他先选择暗号和碰面点', '故意把主动权交给他，看 AI 怎么判定'],
+    intimate_moment: ['把关键动作留给这次自定义剧情自然生成', '选择更暧昧的推进，但接受更高曝光风险', '收住一点，让后果留到下一天发酵'],
+    unexpected_event: ['根据 AI 给出的危机现场立刻补救', '反其道而行，制造更强的话题钩子', '分头撤离，把线索拆成两段'],
+    departure: ['保存一张符合本次设定的纪念照片', '清掉本次自定义约会的关键痕迹', '把下一次约会写成更大胆的提示词'],
+  },
+}
+
+function tailorFallbackChoices<T extends { text: string }>(dateType: DateType, sceneType: DateScene['type'], choices: T[]): T[] {
+  const texts = tailoredFallbackChoiceTexts[dateType]?.[sceneType]
+  if (!texts) return choices
+  return choices.map((choice, index) => ({
+    ...choice,
+    text: texts[index] || choice.text,
+  }))
+}
+
 function generateFallbackScenes(dateType: DateType): DateScene[] {
   const profile = fallbackDateProfiles[dateType] || {
     place: '秘密地点',
@@ -379,44 +451,44 @@ function generateFallbackScenes(dateType: DateType): DateScene[] {
       narrative: profile.hook,
       boyfriendKo: profile.arrivalKo,
       boyfriendZh: profile.arrivalZh,
-      choices: [
+      choices: tailorFallbackChoices(dateType, 'arrival_greeting', [
         { id: `${dateType}_rush_hug`, text: '先抱住他，什么都不问', affection: 7, trust: 2, secrecy: -4, mood: 5 },
         { id: `${dateType}_scan`, text: '确认周围没有镜头再靠近', affection: 1, trust: 2, secrecy: 4, mood: -1 },
         { id: `${dateType}_tease`, text: '低声说“你胆子越来越大了”', affection: 5, trust: 1, secrecy: -2, mood: 4 },
-      ],
+      ]),
     },
     {
       type: 'intimate_moment',
       narrative: profile.intimate,
       boyfriendKo: '너랑 있으면 내가 좀 이상해져.',
       boyfriendZh: '和你在一起的时候，我会变得有点不像自己。',
-      choices: [
+      choices: tailorFallbackChoices(dateType, 'intimate_moment', [
         { id: `${dateType}_closer`, text: '贴近他，让他把话说完', affection: 9, trust: 3, secrecy: -5, mood: 7 },
-        { id: `${dateType}_black_screen`, text: '把手机扣下，留给黑屏后的第二天', affection: 12, trust: 4, secrecy: -8, mood: 8, riskTag: 'adult_fade' },
+        { id: `${dateType}_black_screen`, text: '把手机扣下，留给门后的第二天', affection: 12, trust: 4, secrecy: -8, mood: 8, riskTag: 'adult_fade' },
         { id: `${dateType}_hold_back`, text: '忍住冲动，提醒他别失控', affection: -1, trust: 4, secrecy: 5, mood: -1 },
-      ],
+      ]),
     },
     {
       type: 'unexpected_event',
       narrative: profile.danger,
       boyfriendKo: '잠깐만. 우리 지금 움직이면 더 티 나.',
       boyfriendZh: '等一下。我们现在动反而更明显。',
-      choices: [
+      choices: tailorFallbackChoices(dateType, 'unexpected_event', [
         { id: `${dateType}_freeze`, text: '装作陌生人，各自低头看手机', affection: -2, trust: 1, secrecy: 7, mood: -2 },
         { id: `${dateType}_bold`, text: '继续靠在他身边，赌他们不敢拍', affection: 8, trust: 1, secrecy: -10, mood: 6 },
         { id: `${dateType}_split`, text: '分开十分钟后再汇合', affection: 0, trust: 3, secrecy: 5, mood: 0 },
-      ],
+      ]),
     },
     {
       type: 'departure',
       narrative: `${profile.place}的时间到了，甜蜜没有消失，只是开始变成证据。`,
       boyfriendKo: profile.goodbyeKo,
       boyfriendZh: profile.goodbyeZh,
-      choices: [
+      choices: tailorFallbackChoices(dateType, 'departure', [
         { id: `${dateType}_save_photo`, text: '偷偷拍一张只给自己看的照片', affection: 4, trust: 1, secrecy: -6, mood: 5 },
         { id: `${dateType}_delete_traces`, text: '当场互删定位和聊天预览', affection: -1, trust: 2, secrecy: 6, mood: -1 },
         { id: `${dateType}_promise`, text: '约定下次更疯一点', affection: 6, trust: 2, secrecy: -4, mood: 6 },
-      ],
+      ]),
     },
   ]
 }

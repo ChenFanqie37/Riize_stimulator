@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Camera, Trash2, Phone, MapPin, Ban, Search, Shield, Coffee, Megaphone, Sparkles } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
+import { getIdentityIncidentScript } from '@/data/identityGameplay'
 import type { LucideIcon } from 'lucide-react'
 
 interface ActionDef {
@@ -117,6 +118,19 @@ export default function ActionPanel({ isOpen, onClose, onActionSelect }: ActionP
   const performAction = useGameStore((s) => s.performAction)
   const [selectedAction, setSelectedAction] = useState<ActionDef | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
+  const identityScript = getIdentityIncidentScript(state.player.identity)
+  const visibleActions = actions.map((action) =>
+    action.id === 'use_identity_ability'
+      ? {
+          ...action,
+          name: identityScript.label,
+          riskPreview: `跳转 ${identityScript.app}`,
+          riskDetail: `${identityScript.detail} 这条身份路线会改变：${Object.entries(identityScript.statChanges)
+            .map(([key, value]) => `${key}${value > 0 ? '+' : ''}${value}`)
+            .join('，')}。`,
+        }
+      : action
+  )
 
   if (!isOpen) return null
 
@@ -124,6 +138,9 @@ export default function ActionPanel({ isOpen, onClose, onActionSelect }: ActionP
     if (!selectedAction) return
     const result = performAction(selectedAction.id)
     setLastResult(result)
+    if (selectedAction.id === 'use_identity_ability') {
+      useGameStore.getState().openApp(identityScript.app)
+    }
     if (onActionSelect) onActionSelect(selectedAction.id)
     setSelectedAction(null)
   }
@@ -180,7 +197,7 @@ export default function ActionPanel({ isOpen, onClose, onActionSelect }: ActionP
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {actions.map((action) => {
+          {visibleActions.map((action) => {
             const Icon = action.icon
             const disabled = action.isDisabled(state)
 

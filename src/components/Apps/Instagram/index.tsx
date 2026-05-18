@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Home, PlusSquare, User } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import Feed from './Feed'
@@ -13,6 +13,11 @@ export default function Instagram() {
   const player = useGameStore((s) => s.player)
   const posts = useGameStore((s) => s.instagram.posts)
   const stories = useGameStore((s) => s.instagram.stories)
+  const pendingDraft = useGameStore((s) => s.pendingInstagramDraft)
+
+  useEffect(() => {
+    if (pendingDraft) setTab('newpost')
+  }, [pendingDraft])
 
   if (viewingStoryId) {
     return <Story storyId={viewingStoryId} onClose={() => setViewingStoryId(null)} />

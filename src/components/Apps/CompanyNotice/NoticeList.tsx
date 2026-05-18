@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Bell, Eye } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import type { NoticeLevel } from '@/types/game'
@@ -13,6 +14,15 @@ const levelConfig: Record<NoticeLevel, { label: string; color: string; bg: strin
 
 export default function NoticeList() {
   const notices = useGameStore((s) => s.companyNotice.notices)
+
+  useEffect(() => {
+    useGameStore.setState((state) => ({
+      companyNotice: {
+        ...state.companyNotice,
+        notices: state.companyNotice.notices.map((notice) => ({ ...notice, isRead: true })),
+      },
+    }))
+  }, [])
 
   return (
     <div className="flex flex-col h-full bg-white">

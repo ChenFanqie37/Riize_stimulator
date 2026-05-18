@@ -146,6 +146,16 @@ export interface InstagramComment {
   isSuspicious: boolean
 }
 
+export interface InstagramDraft {
+  postType: PostType
+  category: string
+  caption: string
+  visibility: Visibility
+  showLocation: boolean
+  sourcePhotoId?: string
+  reason: string
+}
+
 export interface WeversePost {
   id: string
   type: WeversePostType
@@ -401,6 +411,7 @@ export interface GameState {
     stories: InstagramPost[]
     dms: ChatMessage[]
   }
+  pendingInstagramDraft: InstagramDraft | null
   weverse: {
     posts: WeversePost[]
     timeline: FanTimelineEntry[]

@@ -436,7 +436,8 @@ function conflictPressure(state: GameState): number {
 
 function conflictBeatCount(state: GameState): number {
   const pressure = conflictPressure(state)
-  let count = currentRound(state) <= 7 ? 1 : Math.random() < pressure ? 1 : 0
+  let count = 1
+  if (currentRound(state) > 7 && Math.random() < pressure * 0.55) count += 1
   if ((state.player.storyPace === 'high_pressure' || state.player.plotPreference === 'C') && Math.random() < pressure * 0.45) count += 1
   if (state.risk.fanSuspicion > 65 && state.risk.companyAlert > 50 && Math.random() < 0.25) count += 1
   return Math.min(3, count)
@@ -960,6 +961,7 @@ const initialState: GameState = {
     stories: [],
     dms: []
   },
+  pendingInstagramDraft: null,
   weverse: {
     posts: [],
     timeline: []
@@ -1221,6 +1223,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         callLogs: []
       },
       instagram: socialContent.instagram,
+      pendingInstagramDraft: null,
       weverse: socialContent.weverse,
       naver: socialContent.naver,
       companyNotice: socialContent.companyNotice,
@@ -1450,7 +1453,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
   },
 
-  openApp: (app) => set({ currentApp: app }),
+  openApp: (app) => {
+    const state = get()
+    set({
+      currentApp: app,
+      notifications: state.notifications.map((notification) =>
+        notification.app === app ? { ...notification, isRead: true } : notification
+      ),
+    })
+  },
 
   closeApp: () => set({ currentApp: null }),
 
@@ -1698,6 +1709,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           player: parsed.player ? { ...parsed.player, bestieName: normalizedBestieName } : initialState.player,
           kakaoTalk: normalizedKakaoTalk,
           hiddenRisk: parsed.hiddenRisk || initialState.hiddenRisk,
+          pendingInstagramDraft: parsed.pendingInstagramDraft || null,
           clueLedger: parsed.clueLedger || [],
           fandomStage: parsed.fandomStage || 'none',
           paparazziStage: parsed.paparazziStage || 'observing',

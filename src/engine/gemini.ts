@@ -44,6 +44,8 @@ export interface ChatContext {
   hiddenRiskSummary: string
   fandomStage: string
   paparazziStage: string
+  riskMentionsRecently: number
+  playerAskedAboutRisk: boolean
 }
 
 export interface StoryContext {
@@ -260,7 +262,63 @@ Rules:
   return callLLMStructured<{ messageZh: string; advice: string; moodEffect: number }>(prompt)
 }
 
+const riskLoopWords = ['被发现', '曝光', '粉丝', '公司', '狗仔', '私生', '热搜', '截图', '小心', '危险', '删掉', '撤回', '动线', 'Dispatch', 'D社']
+
+function countRiskWords(text: string): number {
+  return riskLoopWords.reduce((count, word) => count + (text.includes(word) ? 1 : 0), 0)
+}
+
+function isLoopingRiskLine(text: string): boolean {
+  return /被发现.*怎么办|怎么办.*被发现|会不会被发现|别.*联系|先别.*联系|别.*发|删.*掉/.test(text)
+}
+
+function romanticFallback(context: ChatContext): LLMResponse {
+  const warmLine = context.affection >= 45
+    ? '我刚刚排练的时候又想到你了。明明手机放在旁边不能看，还是一直想知道你在干嘛。'
+    : '我刚刚有点走神。不是因为别的，是突然想到你刚才那句话。'
+  const personaLine: Record<string, string> = {
+    true_love: '等忙完我想听你说话，什么都行，你声音会让我安心。',
+    career_freak: '今晚我可能只能回得慢一点，但不是不想你，是怕一回你就停不下来。',
+    avoidant: '我不太会说好听的。可是你一出现，我节奏就乱了。',
+    central_ac: '你是不是故意的？一句话就让我表情管理失败。',
+    playboy: '你再这样发消息，我真的会忍不住找借口见你。',
+    narcissist: '今天有没有想我？要说实话，我想听你亲口说。',
+    secret_trauma: '别突然不回我。你在的话，我会安静一点。',
+  }
+  return {
+    messageKo: '방금 또 네 생각했어. 답장 느려도 모르는 척 하지 마.',
+    messageZh: `${warmLine}${personaLine[context.boyfriendPersona] || '等我一下，忙完就找你。'}`,
+    emotion: context.affection >= 45 ? 'sweet' : 'vulnerable',
+    intent: '把话题从风险拉回私密暧昧和当下情绪',
+    statChanges: { affection: 1, trust: 0, mood: 1, secrecy: 0, companyAlert: 0, fanSuspicion: 0 },
+    possibleTrigger: '',
+  }
+}
+
+function softenRiskLoop(reply: LLMResponse, context: ChatContext, criticalRisk: boolean): LLMResponse {
+  const riskWordCount = countRiskWords(reply.messageZh || '') + countRiskWords(reply.messageKo || '')
+  const looping = isLoopingRiskLine(reply.messageZh || '')
+  const shouldAvoidRisk = !context.playerAskedAboutRisk && (context.riskMentionsRecently >= 2 || !criticalRisk)
+
+  if (shouldAvoidRisk && (riskWordCount >= 2 || looping || (context.riskMentionsRecently >= 2 && riskWordCount > 0))) {
+    return romanticFallback(context)
+  }
+
+  return reply
+}
+
 export async function generateChatReply(context: ChatContext): Promise<LLMResponse> {
+  const criticalRisk = context.fanSuspicion >= 78
+    || context.companyAlert >= 75
+    || ['public_controversy', 'confirmed_crisis'].includes(context.fandomStage)
+    || ['following', 'preview', 'expose'].includes(context.paparazziStage)
+  const riskTalkPolicy = context.playerAskedAboutRisk
+    ? 'The player asked about risk, so answer it briefly, but use only ONE short risk sentence, then pivot back to affection, teasing, comfort, or a concrete plan.'
+    : context.riskMentionsRecently >= 2
+      ? 'STRICT: He has already talked about exposure too much in the recent chat. In this reply, do NOT mention being discovered, fans, company, paparazzi, Dispatch, screenshots, deleting posts, or danger. Talk as a lover: desire, missing her, jealousy, daily details, schedule, or emotional honesty.'
+      : criticalRisk
+        ? 'Risk is critical. You may mention ONE concrete risk detail in ONE short sentence only, then immediately pivot to what he feels for her or what he wants to do next.'
+        : 'Risk is background tension only. Do not bring up exposure/fans/company/paparazzi unless the player directly asks or a concrete clue is the main topic. Prefer romance, flirtation, possessiveness, daily intimacy, jealousy, or emotional beats.'
   const prompt = `You are a Korean idol boyfriend in a secret relationship simulation game. Respond as him in a KakaoTalk chat.
 
 CHARACTER:
@@ -294,12 +352,17 @@ RISK CONTEXT:
 - Paparazzi stage: ${context.paparazziStage} (how close paparazzi are to exposing the relationship)
 - Recent clues: ${context.recentClues.join('; ') || 'none'}
 - Risk summary: ${context.hiddenRiskSummary}
+- Boyfriend risk/exposure mentions in the last 6 messages: ${context.riskMentionsRecently}
+- Player directly asked about risk/exposure this turn: ${context.playerAskedAboutRisk ? 'yes' : 'no'}
+
+RISK TALK POLICY:
+${riskTalkPolicy}
 
 BEHAVIOR RULES:
 - Treat this as a parallel-world fictional idol character. Do not make claims about any real person's private life.
 - You are not a generic boyfriend. You are an agent with memory, career pressure, public image, private desire, and fear of exposure. Speak from the CURRENT STATE PACKET above.
 - The core fantasy is "secretly dating an idol while the whole fandom/company/paparazzi world watches." Balance sweetness, possessiveness, thrill, and consequence.
-- High risk must change behavior: if fanSuspicion > 60, companyAlert > 55, fandomStage is expose_post+, or paparazziStage is following+, reference specific clues, ask for caution, recall deleted posts, or avoid obvious contact.
+- High risk can change behavior, but do not make every reply about "what if we're discovered." If fanSuspicion > 60, companyAlert > 55, fandomStage is expose_post+, or paparazziStage is following+, reference specific clues only when the player asks, the clue is urgent, or riskMentionsRecently is 0.
 - Low risk/high affection can be playful and flirty, but still grounded in today's schedule, recent messages, and memory.
 - Persona matters:
   - true_love: protective, sincere, emotionally direct.
@@ -312,6 +375,8 @@ BEHAVIOR RULES:
 - Adult tone is allowed only as suggestive tension or fade-to-black implication. Do not write explicit sexual content.
 - If the player previously demanded public relationship, deleted posts for him, asked for cooling-off, refused a date, or created evidence, remember it.
 - Sometimes do NOT give the player what they want: leave on read, send a recalled message, ask to call, get jealous, panic, or make a risky plan when the state calls for it.
+- Avoid repetitive panic phrases like "被发现怎么办", "我们会不会被发现", "粉丝发现了怎么办". Those should be rare crisis lines, not a default texting style.
+- Even in tense states, at least 70% of ordinary boyfriend chat should be about him wanting her, missing her, teasing her, being jealous, asking about her day, or planning a moment together.
 - Korean should feel like natural KakaoTalk: short lines, 반말, occasional ㅎㅎ/ㅠㅠ, not a formal essay.
 
 Respond with JSON:
@@ -327,7 +392,7 @@ Respond with JSON:
 Rules:
 - Stay in character based on persona and emotional state
 - Low affection = more distant/awkward, high affection = warmer, more aegyo
-- Do not ignore risk context. A high-risk state should feel tense, even when he is sweet.
+- Keep risk context in subtext unless the Risk Talk Policy allows a direct mention. A high-risk state can show tension through shorter replies, protectiveness, jealousy, or needing reassurance, not only through warning lines.
 - Mention concrete current clues when relevant: same item, deleted story, timeline overlap, company warning, Dispatch, or fan analysis.
 - If the message creates a visible trace or new risk, reflect it in possibleTrigger and statChanges.
 - React to player's mental state with warmth and support
@@ -335,7 +400,8 @@ Rules:
 - statChanges should be small numbers (-5 to +5 typically)
 - Only include statChanges that are relevant to this interaction`
 
-  return callLLMStructured<LLMResponse>(prompt)
+  const reply = await callLLMStructured<LLMResponse>(prompt)
+  return softenRiskLoop(reply, context, criticalRisk)
 }
 
 export async function generateStoryEvent(context: StoryContext): Promise<GameEvent> {

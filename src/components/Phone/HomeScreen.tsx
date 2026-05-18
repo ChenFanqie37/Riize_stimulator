@@ -42,27 +42,30 @@ const apps: AppItem[] = [
 const dockApps = ['kakaoTalk', 'instagram', 'weverse', 'naver'] as const
 
 function getUnreadCount(appId: AppName | 'stats' | 'actions', state: ReturnType<typeof useGameStore.getState>): number {
+  const appNotifications = appId !== 'stats' && appId !== 'actions'
+    ? state.notifications.filter((n) => n.app === appId && !n.isRead).length
+    : 0
   switch (appId) {
     case 'kakaoTalk':
-      return state.kakaoTalk.threads.reduce((sum, t) => sum + t.unreadCount, 0)
+      return state.kakaoTalk.threads.reduce((sum, t) => sum + t.unreadCount, 0) + appNotifications
     case 'instagram':
-      return state.instagram.dms.filter((m) => !m.isRead).length
+      return state.instagram.dms.filter((m) => !m.isRead).length + appNotifications
     case 'weverse':
-      return state.weverse.posts.filter((p) => p.heat > 50).length
+      return appNotifications
     case 'naver':
-      return state.naver.news.length
+      return appNotifications
     case 'companyNotice':
-      return state.companyNotice.notices.filter((n) => !n.isRead).length
+      return state.companyNotice.notices.filter((n) => !n.isRead).length + appNotifications
     case 'dispatch':
-      return state.dispatch.tips.filter((t) => t.heatLevel > 3).length
+      return appNotifications
     case 'calendar':
-      return state.calendar.events.filter((e) => !e.isCompleted).length
+      return appNotifications
     case 'gallery':
-      return state.gallery.photos.filter((p) => !p.isHidden && !p.isDeleted).length
+      return appNotifications
     case 'notes':
-      return state.notes.entries.length
+      return appNotifications
     case 'health':
-      return state.health.stress > 60 ? 1 : 0
+      return state.health.stress > 60 ? Math.max(1, appNotifications) : appNotifications
     default:
       return 0
   }
